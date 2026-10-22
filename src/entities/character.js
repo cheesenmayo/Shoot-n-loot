@@ -1,9 +1,11 @@
 import * as THREE from 'three';
 import { characterModel, itemModel, gliderModel } from '../models.js';
+import { Animator } from './animation.js';
+import { makeFlash, flicker } from './anim/flash.js';
 import { Inventory, SLOT_COUNT } from '../inventory.js';
 import { ITEMS, RARITIES, gunReload, makeStack } from '../items.js';
 import { WORLD, envAt } from '../world/terrain.js';
-import { clamp, lerp, damp, dampAngle, wrapAngle } from '../util.js';
+import { damp, dampAngle, wrapAngle } from '../util.js';
 
 export const PHYS = {
   radius: 0.38, height: 1.8, crouchHeight: 1.35, step: 0.55,
@@ -13,12 +15,18 @@ export const PHYS = {
 };
 
 const _v = new THREE.Vector3();
-const _hit = {};
-const FLASH = {
-  geo: new THREE.PlaneGeometry(0.34, 0.34),
-  mat: new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }),
-};
+const _v2 = new THREE.Vector3();
+const _up = new THREE.Vector3(0, 1, 0);
 const _env = { desert: 0, snow: 0, rock: 0, forest: 0, sand: 0 };
+// the grapple rope is one shared mesh geometry/material (a unit cylinder, scaled per use)
+const ROPE = { geo: null, mat: null };
+const ropeParts = () => {
+  if (!ROPE.geo) {
+    ROPE.geo = new THREE.CylinderGeometry(0.02, 0.02, 1, 4);
+    ROPE.mat = new THREE.MeshBasicMaterial({ color: 0xffb02a });
+  }
+  return ROPE;
+};
 
 export class Character {
   constructor(game, o) {
@@ -79,7 +87,7 @@ export class Character {
     this.pendingMsg = null;
 
     // visuals
-    const m = characterModel(this.seed, o.look || {});
+    const m = characterModel(this.seed, { skill: this.skill, ...(o.look || {}) });
     this.model = m;
     this.root = m.root;
     this.glider = gliderModel(o.gliderColor ?? [0xff5a2f, 0x2f9bff, 0x35c46a, 0xc94bd8, 0xffc42a][this.seed % 5]);
@@ -87,23 +95,15 @@ export class Character {
     this.root.add(this.glider);
     this.held = null;
     this.heldId = null;
-    this.muzzleFlash = this._makeFlash();
+    this.muzzleFlash = makeFlash();
+    this.anim = new Animator(this);
+    this.lodTick = 0;
+    this.lodAcc = 0;
+    this.deadGround = false;
+    this.deadWater = false;
     game.scene.add(this.root);
     this.root.visible = false;
     this.ropeLine = null;
-  }
-
-  _makeFlash() {
-    const g = new THREE.Group();
-    const mat = FLASH.mat, geo = FLASH.geo;
-    const a = new THREE.Mesh(geo, mat);
-    const b = a.clone();
-    b.rotation.z = Math.PI / 2;
-    const c = new THREE.Mesh(geo, mat);
-    c.rotation.y = Math.PI / 2;
-    g.add(a, b, c);
-    g.visible = false;
-    return g;
   }
 
   get height() { return this.crouching ? PHYS.crouchHeight : PHYS.height; }
@@ -141,17 +141,15 @@ export class Character {
     if (id === this.heldId) return;
     if (this.held) { this.held.parent?.remove(this.held); this.held = null; }
     this.heldId = id;
-    if (!id) return;
+    this.muzzleFlash.parent?.remove(this.muzzleFlash);
+    if (!id) { this.anim.setHeld(null, null); return; }
     const model = itemModel(id);
     const def = st.def;
-    const hand = this.model.armR.hand;
-    if (def.kind === 'gun') { model.rotation.x = -Math.PI / 2; model.position.set(0, -0.02, 0.0); }
-    else if (def.kind === 'melee') { model.rotation.x = -Math.PI / 2 + 0.25; model.position.set(0, -0.02, 0); }
-    else { model.rotation.x = -Math.PI / 2; model.position.set(0, -0.06, 0); }
-    hand.add(model);
+    this.model.armR.hand.add(model);
     this.held = model;
+    this.anim.setHeld(model, def);
     if (def.kind === 'gun') {
-      this.muzzleFlash.position.set(0, 0.03, model.userData.muzzleZ ?? -0.3);
+      this.muzzleFlash.position.set(0, 0.03, (model.userData.muzzleZ ?? -0.3) - 0.02);
       model.add(this.muzzleFlash);
     }
   }
@@ -166,6 +164,7 @@ export class Character {
     this.inv.sel = i;
     this.equipT = this.inv.slots[i].def.kind === 'gun' ? 0.35 : 0.2;
     this.refreshHeld();
+    this.anim.event('equip', this.equipT);
     if (this.isPlayer || this.game.nearPlayer(this.pos, 25)) this.game.audio.play('equip', this.pos, { vol: 0.8, max: 40 });
   }
 
@@ -204,9 +203,22 @@ export class Character {
     if (attacker && attacker !== this) this.lastAttacker = attacker;
     if (info.dir) this.lastHitDir.copy(info.dir);
     this.stats.damageTaken = (this.stats.damageTaken || 0) + amount;
+    this.hitReaction(amount, info);
     this.game.onDamage(this, attacker, amount, info, hadShield && this.shield <= 0);
     if (this.hp <= 0) this.die(attacker, info);
     return amount;
+  }
+
+  /** Flinch / stagger / headshot snap, from the direction the hit came from (info.dir points away from the attacker). */
+  hitReaction(amount, info) {
+    const d = info.dir;
+    if (!d || info.type === 'storm') return;
+    const cy = Math.cos(this.bodyYaw), sy = Math.sin(this.bodyYaw);
+    const lx = d.x * cy - d.z * sy, lb = d.x * sy + d.z * cy; // push to the right / backward in the body frame
+    const heavy = info.explosive || info.melee || amount > 45;
+    const mag = Math.min(1, 0.22 + amount / 90) * (heavy ? 1.5 : 1);
+    this.anim.event('hit', lx, lb, Math.min(1.4, mag));
+    if (info.headshot) this.anim.event('headshot');
   }
 
   heal(hp, shield, hpCap = 100, shieldCap = 100) {
@@ -222,10 +234,21 @@ export class Character {
     this.cancelUse();
     this.reload = null;
     this.grapple = null;
-    const wasAir = this.mode === 'skydive' || this.mode === 'glide';
+    const wasAir = this.mode === 'skydive' || this.mode === 'glide' || (this.mode === 'normal' && !this.grounded && !this.swimming);
     this.mode = 'dead';
     this.glider.visible = false;
-    if (this.held) { this.held.parent?.remove(this.held); this.held = null; this.heldId = null; }
+    this.muzzleFlash.visible = false;
+    if (this.held) { this.held.parent?.remove(this.held); this.held = null; this.heldId = null; this.anim.setHeld(null, null); }
+    // which way the body falls: away from the attacker, or by the current movement
+    const cy = Math.cos(this.bodyYaw), sy = Math.sin(this.bodyYaw);
+    let dx = info.dir ? info.dir.x : this.vel.x, dz = info.dir ? info.dir.z : this.vel.z;
+    let l = Math.hypot(dx, dz);
+    if (l < 0.01) { const a = (this.seed * 2.399) % 6.283; dx = Math.sin(a); dz = Math.cos(a); l = 1; }
+    dx /= l; dz /= l;
+    const power = info.explosive ? 1 : info.melee ? 0.8 : Math.min(1, 0.3 + (this.stats.damageTaken || 0) * 0 + (info.weapon?.dmg || 20) / 120);
+    this.anim.event('die', { dx: dx * cy - dz * sy, dz: dx * sy + dz * cy, power, headshot: !!info.headshot, airborne: wasAir });
+    this.deadGround = !wasAir;
+    this.deadWater = this.swimming;
     this.game.onElimination(this, attacker, info, wasAir);
   }
 
@@ -501,6 +524,7 @@ export class Character {
         if (wantJump && !this.crouching && this.danceT <= 0 && !this.using) {
           this.vel.y = PHYS.jump * (this.buffs.jumpT > 0 ? this.buffs.jump || 1.6 : 1);
           this.grounded = false;
+          this.anim.event('jump');
           if (this.isPlayer || g.nearPlayer(p, 30)) g.audio.play('jump', p, { vol: 0.6, max: 30 });
         }
         // jump pads
@@ -510,6 +534,7 @@ export class Character {
             this.vel.x += pad.vx; this.vel.z += pad.vz;
             this.grounded = false;
             this.noFall = true;
+            this.anim.event('pad');
             g.fx.teleport(p, 'cyan');
             g.audio.play('launchpad', p, { max: 80 });
             break;
@@ -542,6 +567,7 @@ export class Character {
     this.grounded = true;
     this.grapple = null;
     this.vel.y = 0;
+    this.anim.event('land', speedDown);
     if (speedDown > PHYS.fallSafe) {
       if (!this.noFall) {
         const dmg = (speedDown - PHYS.fallSafe) * PHYS.fallDmg;
@@ -721,6 +747,7 @@ export class Character {
     } else if (def.kind === 'gadget') {
       if (inp.firePressed && this.fireCd <= 0) {
         this.fireCd = 0.5;
+        this.anim.event('gadget');
         this.game.combat.useGadget(this, st);
       }
     }
@@ -733,6 +760,7 @@ export class Character {
     st.mag--;
     this.stats.shots++;
     this.flashT = 0.05;
+    this.anim.event('shoot', def.recoil);
     this.bloom = Math.min(4, this.bloom + def.recoil * 0.5);
     this.recoil += def.recoil;
     if (inBurst) {
@@ -748,171 +776,114 @@ export class Character {
     const d = st.def;
     if (st.mag >= d.mag || this.inv.ammo[d.ammo] <= 0) return;
     this.reload = { stack: st, t: 0, dur: gunReload(st) };
+    this.anim.event('reload', d.mag - st.mag);
     this.burstLeft = 0;
     if (this.isPlayer || this.game.nearPlayer(this.pos, 25)) this.game.audio.play('reload', this.pos, { max: 35, vol: 0.7 });
   }
 
   // ---- visuals -------------------------------------------------------------------------------------------------------------------------------------
+  /** Dead bodies keep falling / sliding where they were eliminated, then lie there. */
+  deadPhysics(dt) {
+    const w = this.game.world, p = this.pos, v = this.vel;
+    if (this.deadGround && v.y > 1) this.deadGround = false; // knocked up by a late hit
+    if (!this.deadGround) {
+      v.y = Math.max(-PHYS.terminal, v.y - PHYS.gravity * dt);
+      p.x += v.x * dt; p.z += v.z * dt;
+      const prev = p.y;
+      p.y += v.y * dt;
+      const gy = w.collision.groundAt(p.x, p.z, prev, PHYS.step);
+      const sea = WORLD.seaLevel - 0.9;
+      if (p.y <= gy) {
+        p.y = gy;
+        this.deadGround = true;
+        v.x *= 0.4; v.z *= 0.4; v.y = 0;
+        if (gy < sea) this.deadWater = true;
+      }
+    } else if (v.x * v.x + v.z * v.z > 0.01) {
+      p.x += v.x * dt; p.z += v.z * dt;
+      const k = Math.exp(-7 * dt);
+      v.x *= k; v.z *= k;
+      p.y = w.collision.groundAt(p.x, p.z, p.y + 0.2, PHYS.step);
+    }
+    if (this.deadWater) p.y = Math.max(p.y, WORLD.seaLevel - 1.0) - 0.02 * 0;
+  }
+
   updateDead(dt) {
     this.deadT += dt;
-    const m = this.model;
-    const t = Math.min(1, this.deadT / 0.6);
-    this.root.rotation.x = -Math.PI / 2 * (1 - Math.pow(1 - t, 3));
-    this.root.position.set(this.pos.x, this.pos.y + 0.12 * t, this.pos.z);
-    m.legR.l.rotation.x = lerp(m.legR.l.rotation.x, 0.2, 0.2);
-    m.armR.a.rotation.z = lerp(m.armR.a.rotation.z, 0.5, 0.2);
-    m.armL.a.rotation.z = lerp(m.armL.a.rotation.z, -0.5, 0.2);
+    this.deadPhysics(dt);
+    if (this.renderOn !== false) {
+      this.root.position.copy(this.pos);
+      this.root.rotation.set(0, this.bodyYaw, 0);
+      this.anim.update(dt, 0);
+    }
     if (this.deadT > 30) this.root.visible = false;
   }
 
   updateModel(dt) {
-    const m = this.model;
-    const st = this.stack;
-    const sp = Math.hypot(this.vel.x, this.vel.z);
     const root = this.root;
+    const sp = Math.hypot(this.vel.x, this.vel.z);
     root.position.copy(this.pos);
     this.refreshHeld();
 
-    // facing
-    let targetYaw = this.bodyYaw;
+    // facing: view direction while aiming / airborne, otherwise the way we move
     const aiming = (this.input.fire || this.ads || this.swingT > 0 || this.throwT > 0 || this.game.time - (this.lastShotT || -9) < 1.5) && this.mode === 'normal';
-    if (this.mode === 'skydive' || this.mode === 'glide' || aiming || this.isPlayer && this.stack?.def.kind === 'gun' && (this.ads)) targetYaw = this.yaw;
+    let targetYaw;
+    if (this.mode === 'skydive' || this.mode === 'glide' || aiming || (this.isPlayer && this.ads)) targetYaw = this.yaw;
     else if (sp > 0.8) targetYaw = Math.atan2(-this.vel.x, -this.vel.z);
     else targetYaw = this.bodyYaw;
     if (this.mode === 'normal' && sp <= 0.8 && !aiming) {
       // turn the body if the camera swung far away
-      const diff = wrapAngle(this.yaw - this.bodyYaw);
-      if (Math.abs(diff) > 1.3) targetYaw = this.yaw;
+      if (Math.abs(wrapAngle(this.yaw - this.bodyYaw)) > 1.3) targetYaw = this.yaw;
     }
     this.bodyYaw = dampAngle(this.bodyYaw, targetYaw, 14, dt);
     root.rotation.set(0, this.bodyYaw, 0);
 
-    const t = this.game.time;
-    const body = m.body, torso = m.torso, head = m.head;
-    const legs = [m.legR, m.legL];
-    const arms = [m.armR, m.armL];
-    // reset
-    body.rotation.set(0, 0, 0);
-    body.position.set(0, 0, 0);
-    torso.rotation.set(0, 0, 0);
-    head.rotation.set(0, 0, 0);
+    // level of detail: far characters animate with a cheap pose at a lower rate
+    let lod = 0;
+    if (!this.isPlayer) {
+      const c = this.game.camera.position;
+      const dx = this.pos.x - c.x, dz = this.pos.z - c.z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > 3600) {
+        lod = 1;
+        this.lodAcc += dt;
+        const every = d2 > 22500 ? 4 : 2;
+        if (++this.lodTick % every !== 0) { this.syncFlash(); return; }
+        dt = this.lodAcc;
+        this.lodAcc = 0;
+      } else this.lodAcc = 0;
+    }
+    this.anim.update(dt, lod);
+    this.syncFlash();
+    this.updateRope();
+  }
 
-    if (this.mode === 'skydive') {
-      const dive = this.input.fwd > 0.3;
-      body.rotation.x = -(dive ? 1.3 : 0.9);
-      body.position.y = 1.2;
-      body.position.z = 0.2;
-      m.armR.a.rotation.set(0.5, 0, 1.1); m.armL.a.rotation.set(0.5, 0, -1.1);
-      m.armR.fore.rotation.x = 0.2; m.armL.fore.rotation.x = 0.2;
-      m.legR.l.rotation.set(0.3 + Math.sin(t * 9) * 0.05, 0, 0.35); m.legL.l.rotation.set(0.3 + Math.sin(t * 9 + 1) * 0.05, 0, -0.35);
-      m.legR.shin.rotation.x = -0.2; m.legL.shin.rotation.x = -0.2;
-      head.rotation.x = 0.7;
-      this.glider.visible = false;
-      return;
-    }
-    if (this.mode === 'glide') {
-      this.glider.visible = true;
-      body.rotation.x = -0.12;
-      m.armR.a.rotation.set(Math.PI * 0.93, 0, 0.18); m.armL.a.rotation.set(Math.PI * 0.93, 0, -0.18);
-      m.armR.fore.rotation.x = 0; m.armL.fore.rotation.x = 0;
-      m.legR.l.rotation.set(0.2, 0, 0.05); m.legL.l.rotation.set(0.1, 0, -0.05);
-      m.legR.shin.rotation.x = -0.35; m.legL.shin.rotation.x = -0.15;
-      this.glider.rotation.set(0, 0, clamp(-this.input.strafe * 0.25, -0.3, 0.3));
-      return;
-    }
-    this.glider.visible = false;
+  /** Muzzle flash follows flashT (set by shoot()). */
+  syncFlash() {
+    const def = this.stack?.def;
+    if (this.flashT > 0 && this.held && def && def.kind === 'gun' && this.mode === 'normal') flicker(this.muzzleFlash, def.cat, def.id, this.game.time);
+    else if (this.muzzleFlash.visible) this.muzzleFlash.visible = false;
+  }
 
-    // locomotion phase
-    const stride = this.grounded ? sp : 0;
-    this.phase += dt * (stride * 1.25 + (stride > 0.3 ? 2 : 0));
-    const amp = clamp(stride / 8, 0, 1);
-    const ph = this.phase;
-    const lean = this.sprinting ? 0.22 : 0.08 * amp;
-    body.rotation.x = -lean;
-    if (this.crouching) { body.position.y = -0.38; torso.rotation.x = 0.25; }
-    if (!this.grounded && !this.swimming) {
-      // airborne: tuck legs
-      legs.forEach((l, i) => { l.l.rotation.x = 0.5 - i * 0.5; l.shin.rotation.x = -0.9 + i * 0.3; });
-    } else if (this.swimming) {
-      body.rotation.x = -0.6;
-      body.position.y = -0.1;
-      legs.forEach((l, i) => { l.l.rotation.x = Math.sin(t * 7 + i * Math.PI) * 0.5; l.shin.rotation.x = -0.1; });
-    } else {
-      const bend = this.crouching ? 0.7 : 0;
-      legs.forEach((l, i) => {
-        const s = Math.sin(ph + i * Math.PI);
-        l.l.rotation.x = s * 0.85 * amp + bend * 0.5;
-        l.shin.rotation.x = -(Math.max(0, -Math.sin(ph + i * Math.PI + 0.9)) * 1.1 * amp + bend);
-      });
-    }
-    // arms
-    const swing = Math.sin(ph);
-    const kind = st?.def.kind;
-    const holdingGun = kind === 'gun' && this.mode === 'normal';
-    if (this.danceT > 0) {
-      const s = Math.sin(t * 9);
-      m.armR.a.rotation.set(2.4 + s * 0.4, 0, -0.5 + s * 0.3); m.armL.a.rotation.set(2.4 - s * 0.4, 0, 0.5 - s * 0.3);
-      m.armR.fore.rotation.x = 0.4; m.armL.fore.rotation.x = 0.4;
-      body.position.y = Math.abs(Math.sin(t * 9)) * 0.12 - 0.05;
-      torso.rotation.z = s * 0.2;
-      legs.forEach((l, i) => { l.l.rotation.x = Math.sin(t * 9 + i * Math.PI) * 0.5; l.shin.rotation.x = -Math.abs(Math.sin(t * 9 + i * Math.PI)) * 0.6; });
-    } else if (this.using) {
-      const k = Math.sin(this.using.t * 7) * 0.08;
-      m.armR.a.rotation.set(2.0, 0, 0.1); m.armR.fore.rotation.x = -1.25 + k;
-      m.armL.a.rotation.set(-swing * 0.6 * amp, 0, 0); m.armL.fore.rotation.x = 0;
-      head.rotation.x = 0.1;
-    } else if (this.throwT > 0 && this.pendingThrow) {
-      const k = 1 - this.throwT / 0.28;
-      m.armR.a.rotation.set(lerp(2.6, 0.9, k * k), 0, 0); m.armR.fore.rotation.x = lerp(-0.6, -0.1, k);
-      m.armL.a.rotation.set(-swing * 0.6 * amp, 0, 0); m.armL.fore.rotation.x = 0;
-    } else if (holdingGun) {
-      const p = clamp(this.pitch, -1.2, 1.2);
-      torso.rotation.x = p * 0.3;
-      const rec = Math.min(0.25, this.recoil * 0.035);
-      m.armR.a.rotation.set(Math.PI / 2 + p * 0.65 + rec, 0, -0.1);
-      m.armR.fore.rotation.x = -0.15;
-      m.armL.a.rotation.set(Math.PI / 2 + p * 0.65 + rec - 0.15, 0, 0.42);
-      m.armL.fore.rotation.set(-0.55, 0, 0);
-      head.rotation.x = -p * 0.4;
-      if (this.reload) {
-        const k = this.reload.t / this.reload.dur;
-        m.armL.a.rotation.x = Math.PI / 2 + 0.6 + Math.sin(k * Math.PI * 4) * 0.2;
-        m.armL.fore.rotation.set(-1.2, 0, 0);
-        torso.rotation.x = 0.15;
-      }
-    } else if (kind === 'melee' && this.swingT > 0) {
-      const k = 1 - this.swingT / this.swingDur;
-      const a = lerp(3.0, 0.5, Math.min(1, k * 1.6));
-      m.armR.a.rotation.set(a, 0, -0.15); m.armR.fore.rotation.x = lerp(-0.8, -0.1, k);
-      torso.rotation.y = lerp(0.5, -0.5, k);
-      m.armL.a.rotation.set(0.6 - swing * 0.4 * amp, 0, 0); m.armL.fore.rotation.x = 0;
-    } else {
-      // relaxed carry
-      const a = kind === 'melee' || kind === 'gadget' || kind === 'throw' || kind === 'consume' ? 0.9 : 0.0;
-      m.armR.a.rotation.set(a * 0.8 - swing * 0.8 * amp, 0, 0.04); m.armR.fore.rotation.x = -(a * 0.4) - Math.max(0, swing) * 0.4 * amp;
-      m.armL.a.rotation.set(swing * 0.8 * amp, 0, -0.04); m.armL.fore.rotation.x = -Math.max(0, -swing) * 0.4 * amp;
-      torso.rotation.y = -swing * 0.12 * amp;
-    }
-    if (this.held && holdingGun) {
-      this.muzzleFlash.visible = this.flashT > 0;
-      if (this.flashT > 0) this.muzzleFlash.rotation.z = Math.random() * 3;
-    } else this.muzzleFlash.visible = false;
-
-    // grapple rope
+  updateRope() {
     if (this.grapple) {
       if (!this.ropeLine) {
-        this.ropeLine = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1, 4), new THREE.MeshBasicMaterial({ color: 0xffb02a }));
+        const r = ropeParts();
+        this.ropeLine = new THREE.Mesh(r.geo, r.mat);
+        this.ropeLine.frustumCulled = false;
         this.game.scene.add(this.ropeLine);
       }
-      const a = _v.set(this.pos.x, this.pos.y + 1.3, this.pos.z);
+      // the rope leaves the right hand (fresh matrices: this runs before the frame is rendered)
+      this.root.updateMatrixWorld(true);
+      const a = this.model.armR.hand.getWorldPosition(_v);
       const b = this.grapple;
       const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
-      const len = Math.hypot(dx, dy, dz);
+      const len = Math.hypot(dx, dy, dz) || 1;
       this.ropeLine.visible = true;
       this.ropeLine.position.set(a.x + dx / 2, a.y + dy / 2, a.z + dz / 2);
       this.ropeLine.scale.set(1, len, 1);
-      this.ropeLine.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(dx, dy, dz).normalize());
-    } else if (this.ropeLine) this.ropeLine.visible = false;
+      this.ropeLine.quaternion.setFromUnitVectors(_up, _v2.set(dx / len, dy / len, dz / len));
+    } else if (this.ropeLine && this.ropeLine.visible) this.ropeLine.visible = false;
   }
 
   /** world position of the weapon muzzle (approximate when no model is shown) */
@@ -926,13 +897,12 @@ export class Character {
 
   dispose() {
     this.game.scene.remove(this.root);
-    // the glider is the only per-character geometry/material (everything else is shared)
-    this.glider.traverse((o) => { o.geometry?.dispose(); o.material?.dispose?.(); });
-    if (this.ropeLine) {
-      this.game.scene.remove(this.ropeLine);
-      this.ropeLine.geometry.dispose();
-      this.ropeLine.material.dispose();
-    }
+    // merged part geometries are per character; the glider, flash, rope and materials are shared
+    this.model.dispose();
+    this.anim.dispose();
+    this.muzzleFlash.parent?.remove(this.muzzleFlash);
+    if (this.ropeLine) this.game.scene.remove(this.ropeLine);
+    this.ropeLine = null;
   }
 }
 
