@@ -271,6 +271,8 @@ body.touch input[type=checkbox] { width: 20px; height: 20px; }
 .sbxread .chip b { color: var(--accent); margin: 0 3px 0 2px; font-variant-numeric: tabular-nums; }
 .sbxtags { display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; }
 .sbxtags i { font-style: normal; font-size: 11px; font-weight: 900; letter-spacing: 1px; padding: 1px 8px; border-radius: 3px; background: rgba(53, 232, 255, 0.2); border: 1px solid var(--accent2); color: #c4f8ff; transform: skewX(-8deg); text-shadow: 0 1px 2px #000; }
+.sbxhint { font-size: 12px; letter-spacing: 1px; opacity: 0.7; text-shadow: 0 1px 3px #000; }
+body.sbxopen .sbxhint { display: none; }
 .sbxtarget { display: flex; align-items: center; gap: 8px; min-width: 190px; padding: 3px 10px; background: rgba(10, 14, 26, 0.72); border: 1px solid var(--line); border-radius: 4px; font-size: 12px; font-weight: 800; transform: skewX(-8deg); }
 .sbxtarget > * { transform: skewX(8deg); }
 .sbxtarget .pb { flex: 1; height: 8px; background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 255, 255, 0.5); border-radius: 2px; overflow: hidden; }
@@ -280,7 +282,7 @@ body.sandbox .storm { display: none; }
 
 /* the drawer */
 .sbx { position: absolute; top: 0; right: 0; bottom: 0; z-index: 15; display: none; flex-direction: column; pointer-events: auto; width: clamp(350px, 36vw, 500px);
-  padding-right: env(safe-area-inset-right, 0px); touch-action: pan-y; color: #fff;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) 0; touch-action: pan-y; color: #fff;
   background: linear-gradient(180deg, rgba(15, 20, 36, 0.95), rgba(8, 11, 22, 0.97)); border-left: 3px solid var(--accent2); box-shadow: -14px 0 40px rgba(0, 0, 0, 0.5); backdrop-filter: blur(8px); }
 .sbx.on { display: flex; animation: sbxin 0.18s ease-out; }
 @keyframes sbxin { from { transform: translateX(36px); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -384,7 +386,8 @@ body.touch .sbx-tabs button { padding: 9px 6px; }
 body.touch .sbx-body { padding: 2px 10px 14px; }
 body.touch .sbx-grid { grid-template-columns: 1fr; }
 body.touch .sbx-sel, body.touch .sbx-seg button, body.touch .sbx .sb, body.touch .sbx .tgl { min-height: 44px; }
-body.touch .sbx .sb.mini { min-height: 36px; }
+body.touch .sbx .sb.mini { min-height: 40px; }
+body.touch .sbx-tabs button { min-height: 40px; }
 body.touch .sbx .sb { padding: 8px 8px; font-size: 12px; letter-spacing: 0.5px; }
 body.touch .sbx-tp { grid-template-columns: 1fr 1fr; }
 @media (max-width: 760px) { body.sbxopen .sbxread { display: none; } }
@@ -396,8 +399,8 @@ body.touch .sbx-tp { grid-template-columns: 1fr 1fr; }
   .sbx-foot { padding: 4px 10px; }
   .sbx-foot .rd { font-size: 10px; letter-spacing: 1px; }
   .sbx-foot .rd b { font-size: 13px; }
-  body.touch .sbx-x { width: 38px; height: 38px; }
-  body.touch .sbx-tabs button { padding: 7px 4px; }
+  body.touch .sbx-x { width: 40px; height: 40px; }
+  body.touch .sbx-tabs button { padding: 5px 4px; }
   .sbx-lbl { margin-top: 10px; }
   body.touch .sbxread { top: calc(env(safe-area-inset-top, 0px) + 4px); }
   body.touch .sbxread .chip { font-size: 12px; }

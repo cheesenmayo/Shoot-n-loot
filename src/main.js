@@ -1,11 +1,11 @@
 import { Game } from './game.js';
-import { ITEMS, makeStack } from './items.js';
+import { ITEMS, AMMO, RARITIES, makeStack } from './items.js';
 
 const canvas = document.getElementById('game');
 const ui = document.getElementById('ui');
 const game = new Game(canvas, ui);
 window.__game = game;
-window.__items = { ITEMS, makeStack };
+window.__items = { ITEMS, AMMO, RARITIES, makeStack };
 
 const manual = /[?&]manual/.test(location.search);
 

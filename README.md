@@ -16,6 +16,7 @@ npm start          # builds and serves on http://localhost:8080
 
 Click **PLAY**, then click inside the game to capture the mouse (Esc releases it and pauses).
 If your browser refuses pointer lock, move the mouse to look, or use the arrow keys.
+Click **SANDBOX** instead for a practice range with every item and spawnable enemies (see [Sandbox](#sandbox)).
 
 ### On a phone or tablet
 
@@ -33,6 +34,7 @@ the game asks you to rotate and pauses while you hold the device upright. Phones
 | **PICK UP / OPEN** | appears next to loot and chests (hold it to open a chest) |
 | hotbar | tap a slot to switch items |
 | ⏸ / pin | pause menu / map |
+| ⚗ (flask, Sandbox only) | open the sandbox tools |
 
 Aim assist (on by default, optional in settings) gently pulls shots and the camera toward an enemy near the crosshair.
 
@@ -47,8 +49,37 @@ Aim assist (on by default, optional in settings) gently pulls shots and the came
 | **1–6 / wheel** | select slot | **G** | drop selected item |
 | **M / Tab** | map | **X** / **V** | swap shoulder / first person |
 | **Esc** | pause / settings | **← → ↑ ↓** | look (when mouse lock is unavailable) |
+| **B** *(Sandbox)* | open / close the sandbox tools | **F3** | show FPS |
 
 In the air: **W** dives, **S** slows, **A/D** steer, **Space** deploys the glider early (it opens automatically near the ground).
+
+## Sandbox
+
+**SANDBOX** on the title screen drops you alone on the ground at Parkour Plaza: no bus, no storm, no placement and no
+Victory Royale, but the whole island is still there with its chests and ground loot. Press **B** (the flask button on a
+phone, or *Sandbox tools* in the pause menu) to open the tools drawer. While it is open the simulation stands still
+(the camera and HUD keep running, nothing can shoot you), so you can browse, spawn and teleport in peace; closing it
+(B, ✕ or Esc) resumes play. A second Esc pauses as usual, and the pause menu says **Leave sandbox**.
+
+* **Items**: every item in the game with a rendered thumbnail and its key stats, grouped by category. Pick a rarity
+  (Common to Legendary, clamped to what each item can be) and click an item to get it: stackables fill their stack,
+  weapons take the first free slot (otherwise they replace the selected one; the pickaxe is never touched), the item is
+  equipped and its ammo topped up. **Max ammo**, **Clear inventory** (keeps the pickaxe) and five loadouts
+  (*Assault, Sniper nest, Demolition, Parkour kit, Medic*) fill slots 1-5 with matching ammo.
+* **Enemies**: spawn real bots with the normal AI. Choose a skill (*Noob / Average / Pro / Dummy*), a weapon (random loadout,
+  pickaxe only or any weapon at the chosen rarity), a count (1, 3, 5, 10, 20), a placement (10 / 20 / 40 m in front of you
+  or a ring around you), health (*Normal 100 / Tough 250 / Punching bag 1000 with auto-regen*) and behaviour
+  (*Hostile* hunts you, *Passive* idles until hit, *Dummy* never moves or shoots). **Clear all enemies** and **Respawn dummies**
+  are one click away. Up to **40** enemies can be alive at once; enemies never hurt each other, and corpses disappear
+  after a few seconds (they still drop their loot). The minimap shows enemies as red dots and a bar under the damage
+  readout shows the health of whoever you hit last.
+* **Player**: God mode (no damage, no fall damage), Infinite ammo, Infinite consumables, Super speed, **Heal**, teleports to all
+  eight locations (always to a safe spot on the ground), a 300 m **Sky drop**, and a time scale (0.25× / 0.5× / 1×) for
+  studying animations and projectiles.
+* **Readout**: total damage, DPS over the last 3 s and the last hit (with a HEAD flag) are shown on the HUD and in the
+  drawer footer, with a reset button.
+* If you are eliminated you respawn at the same spot after about 1.5 s with full health and your inventory (unless God mode
+  is on). Your panel choices (tab, rarity, spawn options) are remembered between visits.
 
 ## Graphics
 
@@ -117,6 +148,7 @@ src/entities/              character (shared by player + bots), player controlle
 src/items.js, loot.js      item database + loot tables, ground items & chests
 src/combat.js, fx.js       hitscan/projectiles/explosions, particles & tracers
 src/hud.js, audio.js       HUD / menus / minimap, synthesised sound
+src/sandbox*.js            sandbox mode: state + actions (sandbox.js), drawer UI (sandboxpanel.js), item thumbnails, data
 tools/                     build, dev server, headless tests and screenshot helpers
 dist/game.js               bundled output (committed so index.html works offline)
 ```
@@ -129,6 +161,10 @@ npm run watch       # rebuild on change (unminified + sourcemap)
 npm run bundle      # also writes dist/shoot-n-loot.html (everything inlined in one file)
 npm test            # headless Chromium: mechanics, keyboard/mouse and phone touch tests (needs `playwright`)
 ```
+
+`node tools/sandbox-test.mjs [--shots]` drives the Sandbox mode through its real UI on a desktop viewport and on an emulated
+phone (title button, B key / flask button, panel clicks, Esc handling, every item, spawn options, the 40 enemy cap, cheats,
+teleports, death and respawn, enter / leave cycles without leaks); `--shots` writes panel screenshots to `tools/shots/`.
 
 `node tools/probe.mjs '<js>' [name|page:name]` runs a snippet inside the loaded game and optionally saves a screenshot
 to `tools/shots/` (handy for poking at the world without a GPU).

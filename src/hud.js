@@ -108,7 +108,7 @@ export class HUD {
       <div class="scope" id="scope"></div>
       <div class="feed" id="feed"></div>
       <div class="storm" id="storm"><span class="chip" id="storm-chip"><span id="storm-txt"></span></span></div>
-      <div class="sbxread hidden" id="sbx-read"><div class="chip"><span id="sbx-stats"></span></div><div class="sbxtarget hidden" id="sbx-target"><span id="sbx-tn"></span><div class="pb"><div id="sbx-tf"></div></div><span id="sbx-tv"></span></div><div class="sbxtags" id="sbx-tags"></div></div>
+      <div class="sbxread hidden" id="sbx-read"><div class="chip"><span id="sbx-stats"></span></div><div class="sbxtarget hidden" id="sbx-target"><span id="sbx-tn"></span><div class="pb"><div id="sbx-tf"></div></div><span id="sbx-tv"></span></div><div class="sbxtags" id="sbx-tags"></div><div class="sbxhint kb"><kbd>B</kbd> sandbox tools</div></div>
       <div class="topright">
         <div class="counters">
           <div class="chip" id="chip-alive"><span><span id="alive-ic">👥</span> <span id="alive">50</span></span></div>

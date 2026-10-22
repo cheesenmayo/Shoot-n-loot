@@ -12,5 +12,8 @@ const [html, css, js] = await Promise.all([
 const out = html
   .replace('<link rel="stylesheet" href="style.css">', () => `<style>\n${css}\n</style>`)
   .replace('<script src="dist/game.js"></script>', () => `<script>\n${js.replace(/<\/script/gi, '<\\/script')}\n</script>`);
+// every stylesheet and script has to be inlined by now (a new <link> / <script src> in index.html would otherwise break the single file)
+const leftovers = out.match(/<(?:link\b[^>]*\brel=["']?stylesheet|script\b[^>]*\bsrc=)[^>]*>/gi);
+if (leftovers) throw new Error(`index.html still loads external files: ${leftovers.join(' ')}`);
 await writeFile(join(root, 'dist/shoot-n-loot.html'), out);
 console.log(`dist/shoot-n-loot.html  ${(out.length / 1024).toFixed(0)} kB`);

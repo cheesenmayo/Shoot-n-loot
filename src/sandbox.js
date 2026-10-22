@@ -21,6 +21,7 @@ const SUPER_SPEED = 1.9;
 const PLACE_DIST = { f10: 10, f20: 20, f40: 40 };
 
 const DEFAULTS = { tab: 'items', rarity: 3, skill: 'avg', weapon: 'random', count: 3, place: 'f20', health: 'normal', behaviour: 'hostile' };
+const NUDGES = [[0, 0], [2, 0], [-2, 0], [0, 2], [0, -2], [3.5, 3.5], [-3.5, 3.5], [3.5, -3.5], [-3.5, -3.5]];
 const _s = new THREE.Vector3(), _t = new THREE.Vector3();
 
 /** Panel choices survive reloads through the shared settings object; anything unexpected falls back to the default. */
@@ -330,11 +331,11 @@ export class Sandbox {
 
   // ---- placement helpers ------------------------------------------------------------------------------------------------------------------
   /** Is (x, z) a place a character can stand: dry, not steep, not inside geometry, with headroom? Writes the spot to `out`. */
-  spotOk(x, z, refY, clear, noBuilding, out) {
+  spotOk(x, z, refY, clear, noBuilding, out, maxDy = 1e9) {
     const w = this.game.world, col = w.collision;
     if (x * x + z * z > (WORLD.islandR - 30) ** 2) return false;
     const y = col.groundAt(x, z, refY + 1.2, 0.6);
-    if (y < WORLD.seaLevel + 0.6) return false;
+    if (y < WORLD.seaLevel + 0.6 || Math.abs(y - refY) > maxDy) return false;
     if (w.terrain.slope(x, z) > 0.6 && y - w.terrain.height(x, z) < 0.3) return false;
     if (noBuilding && w.buildingAt(x, z)) return false;
     _t.set(x, y, z);
@@ -470,17 +471,10 @@ export class Sandbox {
     const room = ENEMY_CAP - this.liveCount();
     if (room <= 0) { g.hud.toast(`Enemy limit reached (${ENEMY_CAP})`); return 0; }
     const want = Math.min(o.count, room);
-    const taken = [];
     const spots = [];
     for (const [cx, cz] of this.candidates(want, o.place)) {
-      let spot = null;
-      for (const [dx, dz] of [[0, 0], [2, 0], [-2, 0], [0, 2], [0, -2], [3.5, 3.5], [-3.5, 3.5], [3.5, -3.5], [-3.5, -3.5]]) {
-        if (!this.spotOk(cx + dx, cz + dz, p.pos.y, 0.45, true, _s)) continue;
-        if (taken.some((q) => Math.hypot(q.x - _s.x, q.z - _s.z) < 1.2)) continue;
-        spot = _s.clone();
-        break;
-      }
-      if (spot) { taken.push(spot); spots.push(spot); }
+      const spot = this.spotNear(cx, cz, spots);
+      if (spot) spots.push(spot);
     }
     const names = this.names(spots.length);
     spots.forEach((s, i) => this.addEnemy(s, o, names[i]));
@@ -489,6 +483,18 @@ export class Sandbox {
     else g.hud.toast(`Spawned ${spots.length} enem${spots.length === 1 ? 'y' : 'ies'}${trimmed ? ` · limit is ${ENEMY_CAP}` : ''}`);
     this.panel.sync();
     return spots.length;
+  }
+
+  /** A standing spot for an enemy close to (cx, cz), level with the player and clear of the spots already `taken`. */
+  spotNear(cx, cz, taken) {
+    const y = this.game.player.pos.y;
+    const free = (x, z) => this.spotOk(x, z, y, 0.45, true, _s, 4) && !taken.some((q) => Math.hypot(q.x - _s.x, q.z - _s.z) < 1.2);
+    for (const [dx, dz] of NUDGES) if (free(cx + dx, cz + dz)) return _s.clone();
+    for (let k = 1; k < 60; k++) {
+      const r = 3 + 2.2 * Math.sqrt(k), a = k * 2.399963;
+      if (free(cx + Math.cos(a) * r, cz + Math.sin(a) * r)) return _s.clone();
+    }
+    return null;
   }
 
   addEnemy(spot, o, name, yaw = null) {
@@ -508,7 +514,7 @@ export class Sandbox {
     ch.place(spot.x, spot.y, spot.z);
     ch.yaw = ch.bodyYaw = yaw ?? Math.atan2(-(p.pos.x - spot.x), -(p.pos.z - spot.z));
     ch.hp = hpDef[2];
-    this.equipEnemy(ch, o.weapon);
+    this.equipEnemy(ch, o.weapon, o.rarity);
     g.chars.push(ch);
     g.bots.push(bot);
     g.botOf.set(ch, bot);
@@ -518,7 +524,7 @@ export class Sandbox {
   }
 
   /** Weapons for a new enemy: a random loadout, just a pickaxe, or one specific weapon at the panel's rarity. */
-  equipEnemy(ch, weapon) {
+  equipEnemy(ch, weapon, rarity) {
     const inv = ch.inv;
     const give = (id, rarity, count = null) => {
       const slot = inv.freeSlot();
@@ -539,7 +545,7 @@ export class Sandbox {
       give(heal.id, 0, heal.count);
       if (Math.random() < 0.3) { const t = rollLoot({ forceGroup: 'throw' }); give(t.id, 0, t.count); }
     } else if (weapon !== 'pickaxe' && ITEMS[weapon]) {
-      give(weapon, this.cfg.rarity);
+      give(weapon, rarity);
     }
     const first = inv.slots.findIndex((s, i) => i > 0 && s && (s.def.kind === 'gun' || s.def.kind === 'melee'));
     if (first > 0) ch.equip(first);
@@ -572,8 +578,10 @@ export class Sandbox {
     if (!spots.length) { this.game.hud.toast('No dummies to respawn'); return; }
     this.dummySpots = [];
     for (const rec of this.enemies.filter((e) => e.dummy)) this.removeEnemy(rec);
-    for (const s of spots) this.addEnemy(s.spot, s.opts, s.name, s.yaw);
-    this.game.hud.toast(`Respawned ${spots.length} dumm${spots.length === 1 ? 'y' : 'ies'}`);
+    const room = Math.max(0, ENEMY_CAP - this.liveCount());
+    const back = spots.slice(0, room);
+    for (const s of back) this.addEnemy(s.spot, s.opts, s.name, s.yaw);
+    this.game.hud.toast(`Respawned ${back.length} dumm${back.length === 1 ? 'y' : 'ies'}`);
     this.panel.sync();
   }
 }
