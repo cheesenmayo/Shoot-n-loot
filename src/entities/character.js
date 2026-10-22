@@ -375,7 +375,7 @@ export class Character {
       if (this.hot.t >= this.hot.dur) this.hot = null;
     }
     if (this.danceT > 0) { inp.fire = false; inp.firePressed = false; inp.jumpPressed = false; }
-    if (this.buffs.runT > 0 && this.grounded && (this.isPlayer || g.nearPlayer(this.pos, 60)) && Math.random() < dt * 24) g.fx.heal(this.pos, 'speed');
+    if (this.buffs.runT > 0 && (this.isPlayer || g.nearPlayer(this.pos, 80))) g.fx.runTrail(this.pos, this.vel, dt);
 
     // movement
     let left = dt;
@@ -484,6 +484,7 @@ export class Character {
           if (Math.abs(p.y - th) < 0.2) {
             const e = envAt(p.x, p.z, th, 0, _env);
             lp = e.snow > 0.5 ? 380 : e.desert > 0.5 || e.sand > 0.5 ? 480 : 760;
+            if (this.sprinting) g.fx.footstep(p, e.snow > 0.5 ? 'snow' : 'dirt');
           }
           g.audio.play('step', this.isPlayer ? null : p, { vol: this.isPlayer ? 0.28 : 0.8, max: 38, lp });
         }
@@ -568,10 +569,10 @@ export class Character {
     this.grapple = null;
     this.vel.y = 0;
     this.anim.event('land', speedDown);
+    if (speedDown > 7 && (this.isPlayer || g.nearPlayer(this.pos, 45))) g.fx.landing(this.pos, speedDown);
     if (speedDown > PHYS.fallSafe) {
       if (!this.noFall) {
         const dmg = (speedDown - PHYS.fallSafe) * PHYS.fallDmg;
-        g.fx.dust(this.pos, 14);
         this.takeDamage(dmg, null, { type: 'fall' });
         if (this.isPlayer) g.hud?.flashDamage(0.6);
       }

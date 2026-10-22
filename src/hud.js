@@ -105,6 +105,7 @@ export class HUD {
       <div class="vignette dmg" id="v-dmg"></div>
       <div class="vignette storm" id="v-storm"></div>
       <div class="vignette water" id="v-water"></div>
+      <div class="vignette speed" id="v-speed"></div>
       <div class="scope" id="scope"></div>
       <div class="feed" id="feed"></div>
       <div class="storm" id="storm"><span class="chip" id="storm-chip"><span id="storm-txt"></span></span></div>
@@ -393,6 +394,10 @@ export class HUD {
     this.$('#v-dmg').style.opacity = this.dmgA;
     this.$('#v-storm').style.opacity = ch.alive && ch.inStorm ? 0.55 + Math.sin(g.time * 4) * 0.15 : 0;
     this.$('#v-water').style.opacity = g.camera.position.y < 0 ? 1 : 0;
+    // speed lines: the Runana boost and a fast skydive
+    const spT = !ch.alive ? 0 : Math.max(ch.buffs.runT > 0 ? Math.min(1, ch.buffs.runT / 0.6) * 0.75 : 0, ch.mode === 'skydive' ? Math.min(1, -ch.vel.y / 70) * 0.55 : 0);
+    this.speedA = (this.speedA || 0) + (spT - (this.speedA || 0)) * Math.min(1, dt * 8);
+    this.$('#v-speed').style.opacity = this.speedA < 0.01 ? 0 : this.speedA.toFixed(3);
     this.$('#cross').classList.toggle('assist', !!g.controller?.assisting);
     this.$('#scope').style.display = g.controller?.scoped ? 'block' : 'none';
 

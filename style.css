@@ -122,6 +122,9 @@ kbd { background: rgba(255, 255, 255, 0.14); border: 1px solid var(--line); bord
 .vignette.dmg { background: radial-gradient(ellipse at center, transparent 45%, rgba(220, 20, 20, 0.7)); }
 .vignette.storm { background: radial-gradient(ellipse at center, rgba(120, 30, 190, 0.18) 30%, rgba(130, 40, 220, 0.6)); }
 .vignette.water { background: rgba(20, 90, 150, 0.45); }
+.vignette.speed { background: repeating-conic-gradient(from 0deg at 50% 50%, rgba(255, 255, 255, 0) 0deg 5deg, rgba(190, 240, 255, 0.55) 5deg 5.5deg, rgba(255, 255, 255, 0) 5.5deg 11deg);
+  -webkit-mask-image: radial-gradient(ellipse at center, transparent 40%, #000 85%); mask-image: radial-gradient(ellipse at center, transparent 40%, #000 85%); transition: none; animation: speedspin 0.2s steps(2) infinite; }
+@keyframes speedspin { to { transform: rotate(5.5deg); } }
 .vignette.fall { background: radial-gradient(ellipse at center, transparent 55%, rgba(255, 255, 255, 0.25)); }
 .scope { position: absolute; inset: 0; background: radial-gradient(circle at center, transparent 0, transparent 30vmin, #000 30.4vmin); display: none; }
 .scope::before, .scope::after { content: ''; position: absolute; background: rgba(0, 0, 0, 0.8); }

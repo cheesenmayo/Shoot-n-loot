@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mat } from './models.js';
 
 const ALT = 330;
+const SMOKE = [0.95, 0.96, 1], SMOKE_END = [0.75, 0.8, 0.9];
 
 export class Bus {
   constructor(game) {
@@ -64,6 +65,27 @@ export class Bus {
       m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
       g.add(m);
     }
+    // rear propeller, a pennant on the balloon and a light on the nose
+    const hubMat = mat(0x222831, { metal: 0.5 }), bladeMat = mat(0xf4f4f4, { metal: 0.1, rough: 0.5 });
+    this.prop = new THREE.Group();
+    this.prop.position.set(0, 0.2, 7.5);
+    this.prop.add(new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.5, 10).rotateX(Math.PI / 2), hubMat));
+    for (const a of [0, Math.PI / 2]) {
+      const bl = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.55, 0.08), bladeMat);
+      bl.rotation.z = a;
+      bl.position.z = 0.25;
+      this.prop.add(bl);
+    }
+    g.add(this.prop);
+    const poleTop = 21 + 9 * 1.15;
+    B(0.12, 2.4, 0.12, 0x333333, 0, poleTop + 1.0, 0);
+    this.flag = new THREE.Group();
+    this.flag.position.set(0, poleTop + 1.8, 0);
+    const cloth = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.1, 2.6), mat(0xffd23f, { metal: 0, rough: 0.8 }));
+    cloth.position.z = 1.3;
+    this.flag.add(cloth);
+    g.add(this.flag);
+    this.nextPuff = 0;
     g.scale.setScalar(1.25);
   }
 
@@ -93,6 +115,15 @@ export class Bus {
     this.group.position.copy(this.pos);
     this.group.position.y += 0.0;
     this.group.position.y = this.pos.y + Math.sin(this.t * 1.3) * 0.3;
+    this.prop.rotation.z += dt * 22;
+    this.flag.rotation.y = Math.sin(this.t * 4.5) * 0.35;
+    // a soft contrail from the rear of the bus
+    this.nextPuff -= dt;
+    const fx = this.game.fx;
+    if (this.nextPuff <= 0 && fx && fx.quality > 0.3) {
+      this.nextPuff = 0.07;
+      fx.alpha.emit(this.pos.x - this.dir.x * 11, this.pos.y - 0.4, this.pos.z - this.dir.z * 11, (Math.random() - 0.5) * 0.6, 0.15, (Math.random() - 0.5) * 0.6, 3.2, 2.2, 8, SMOKE, SMOKE_END, 0.2, 0, 0.4);
+    }
     if (this.t * this.speed >= this.length) {
       this.active = false;
       this.group.visible = false;

@@ -254,7 +254,7 @@ const builders = {
     rifleStock(r, 0x2b3a2b, 0.23);
     magazine(r, 0, -0.07, -0.085, 0.032, 0.13, 0.048, 0x1f281f, 0.14);
     r.part('slide', 0, 0.07, 0.05, (s) => s.metal.box(0, 0.01, 0, 0.018, 0.022, 0.03, STEEL));
-    r.ud = { muzzleZ: -0.53, gripL: [0, -0.03, -0.3], magPos: [0, -0.1, -0.085], stockPos: [0, 0.04, 0.32] };
+    r.ud = { muzzleZ: -0.53, gripL: [0, -0.03, -0.3], magPos: [0, -0.1, -0.085], stockPos: [0, 0.04, 0.32], eject: [0.025, 0.05, -0.04] };
   },
   heavy_ar(r) {
     pistolGrip(r, DARK, 0.012);
@@ -271,7 +271,7 @@ const builders = {
     magazine(r, 0, -0.065, -0.09, 0.04, 0.115, 0.064, 0x2a2520, 0.12);
     r.metal.box(0.0305, 0.014, -0.12, 0.003, 0.024, 0.05, ORANGE, { ao: 1 });
     r.part('slide', 0, 0.075, 0.08, (s) => s.metal.box(0, 0.01, 0, 0.022, 0.026, 0.034, STEEL));
-    r.ud = { muzzleZ: -0.58, gripL: [0, -0.03, -0.34], magPos: [0, -0.095, -0.09], stockPos: [0, 0.04, 0.35] };
+    r.ud = { muzzleZ: -0.58, gripL: [0, -0.03, -0.34], magPos: [0, -0.095, -0.09], stockPos: [0, 0.04, 0.35], eject: [0.03, 0.052, -0.04] };
   },
   lever(r) {
     // brass receiver, octagonal barrel, tube magazine, walnut stock and fore-end
@@ -376,7 +376,7 @@ const builders = {
     zbox(r.matte, 0, 0.034, 0.18, 0.04, 0.056, 0.2, 0x4a2e2e, { taper: [0.9, 0.9] });
     r.matte.box(0, 0.02, 0.285, 0.044, 0.1, 0.012, BLACK);
     r.part('slide', 0, 0.08, 0.06, (s) => s.metal.box(0, 0.01, 0, 0.018, 0.022, 0.034, STEEL));
-    r.ud = { muzzleZ: -0.58, gripL: [0, -0.03, -0.36], magPos: [0, -0.06, -0.1], stockPos: [0, 0.03, 0.29] };
+    r.ud = { muzzleZ: -0.58, gripL: [0, -0.03, -0.36], magPos: [0, -0.06, -0.1], stockPos: [0, 0.03, 0.29], eject: [0.03, 0.04, -0.02] };
   },
 
   // ---- snipers --------------------------------------------------------------------------------------------------------
@@ -422,7 +422,7 @@ const builders = {
     r.metal.box(0.02, -0.04, -0.6, 0.006, 0.05, 0.006, STEEL, { rot: [0.2, 0, 0.3] });
     r.metal.box(-0.02, -0.04, -0.6, 0.006, 0.05, 0.006, STEEL, { rot: [0.2, 0, -0.3] });
     r.part('slide', 0, 0.07, 0.07, (s) => s.metal.box(0, 0.01, 0, 0.018, 0.022, 0.03, STEEL));
-    r.ud = { muzzleZ: -0.85, gripL: [0, -0.03, -0.38], magPos: [0, -0.1, -0.09], stockPos: [0, 0.03, 0.36] };
+    r.ud = { muzzleZ: -0.85, gripL: [0, -0.03, -0.38], magPos: [0, -0.1, -0.09], stockPos: [0, 0.03, 0.36], eject: [0.028, 0.04, -0.03] };
   },
 
   // ---- heavy -------------------------------------------------------------------------------------------------------------
@@ -446,7 +446,7 @@ const builders = {
     zbox(r.matte, 0, 0.034, 0.22, 0.05, 0.1, 0.22, 0x3b4a2e, { taper: [0.95, 0.9] });
     r.matte.box(0, 0.02, 0.335, 0.05, 0.106, 0.012, BLACK);
     r.part('slide', 0, 0.092, 0.08, (s) => s.metal.box(0, 0.01, 0, 0.022, 0.024, 0.034, STEEL));
-    r.ud = { muzzleZ: -0.72, gripL: [0, -0.03, -0.36], magPos: [0, -0.1, -0.05], stockPos: [0, 0.03, 0.34] };
+    r.ud = { muzzleZ: -0.72, gripL: [0, -0.03, -0.36], magPos: [0, -0.1, -0.05], stockPos: [0, 0.03, 0.34], eject: [0.036, 0.04, -0.03] };
   },
   minigun(r) {
     // rotating barrel cluster (named part: spins about Z) in a housing, motor block and carry handle
@@ -887,7 +887,7 @@ export function ammoModel(type) {
 // Chest
 // ---------------------------------------------------------------------------
 const CHEST_GLOW_GEO = new THREE.CylinderGeometry(0.9, 0.9, 0.02, 20);
-const CHEST_GLOW_MAT = new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+export const CHEST_GLOW_MAT = new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
 const GOLD = 0xf2b62a, GOLD2 = 0xffe08a;
 let chestTemplate = null;
 

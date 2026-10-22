@@ -7,6 +7,9 @@ const R_BODY = 0.4;
 const _o = new THREE.Vector3(), _d = new THREE.Vector3(), _m = new THREE.Vector3(), _n = new THREE.Vector3(), _p = new THREE.Vector3();
 const hitInfo = {};
 const _assist = new THREE.Vector3();
+const _e = new THREE.Vector3();
+// guns that throw a casing when they fire: 0 = brass, 1 = shotgun shell
+const EJECT = { pistol: 0, smg: 0, silenced_smg: 0, ar: 0, burst_ar: 0, heavy_ar: 0, lmg: 0, semi_sniper: 0, tac_shotgun: 1, auto_shotgun: 1 };
 // shared projectile geometry (created once, reused for every shot)
 const ROCKET = {
   bodyGeo: new THREE.CylinderGeometry(0.06, 0.06, 0.5, 8).rotateX(Math.PI / 2),
@@ -139,7 +142,12 @@ export class Combat {
       }
     }
     // feedback
-    g.fx.muzzle(muzzle, base, def.cat === 'shotgun' || def.cat === 'launcher' ? 1.6 : 1);
+    if (ch.isPlayer || g.nearPlayer(ch.pos, 170)) {
+      g.fx.muzzle(muzzle, base, def.cat === 'shotgun' || def.cat === 'launcher' ? 1.6 : 1, def.cat);
+      // casings leave through the weapon's ejection port (only for guns that eject on firing)
+      const eject = ch.held && EJECT[def.id] !== undefined ? ch.held.userData.ejectPos : null;
+      if (eject) g.fx.shell(ch.held.localToWorld(_e.copy(eject)), base, EJECT[def.id] === 1, ch.vel);
+    }
     g.audio.play('gun:' + def.sound, ch.pos, { max: Math.max(80, def.noise * 2.2), vol: ch.isPlayer ? 0.8 : 1 });
     g.noise(ch.pos, def.noise, ch);
   }

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { ITEMS, AMMO, RARITIES, makeStack, rollLoot, rollChest } from './items.js';
-import { itemModel, ammoModel, chestModel } from './models.js';
+import { itemModel, ammoModel, chestModel, CHEST_GLOW_MAT } from './models.js';
 import { POI_BY_ID } from './world/poidata.js';
 import { WORLD } from './world/terrain.js';
 import { mulberry32 } from './util.js';
@@ -35,9 +35,12 @@ export class LootManager {
     this.group.name = 'loot';
     game.scene.add(this.group);
     this.hum = 0;
+    this.fliers = []; // picked-up items on their way to the player (visual only)
   }
 
   clear() {
+    for (const f of this.fliers) this.group.remove(f.mesh);
+    this.fliers.length = 0;
     for (const d of this.drops) if (d.mesh) this.group.remove(d.mesh);
     for (const c of this.chests) { if (c.mesh) this.group.remove(c.mesh); if (c.beam) this.group.remove(c.beam); }
     this.drops = [];
@@ -182,17 +185,50 @@ export class LootManager {
       const name = d.ammo ? AMMO[d.ammo].name : d.stack.def.name;
       this.game.hud?.pickupToast(name, d.ammo ? 0 : d.stack.rarity, d.ammo ? true : false, d.ammo ? '' : d.stack.def.desc || '');
     }
-    if (empty) this.removeDrop(d);
+    if (empty) this.removeDrop(d, ch);
     else if (d.mesh) d.mesh.userData.dirty = true;
     return true;
   }
 
-  removeDrop(d) {
+  removeDrop(d, picker = null) {
     d.dead = true;
     this.cellRemove(d);
-    if (d.mesh) { this.group.remove(d.mesh); d.mesh = null; }
+    if (d.mesh) {
+      // the item flies to the player instead of vanishing
+      if (picker && picker.isPlayer && picker.alive && this.game.state !== 'menu') this.fly(d.mesh, picker, d);
+      else this.group.remove(d.mesh);
+      d.mesh = null;
+    }
     const i = this.drops.indexOf(d);
     if (i >= 0) this.drops.splice(i, 1);
+  }
+
+  fly(mesh, ch, d) {
+    const u = mesh.userData;
+    if (u.beam) mesh.remove(u.beam);
+    if (u.disc) mesh.remove(u.disc);
+    const color = d.ammo ? new THREE.Color(AMMO[d.ammo].color).getHex() : new THREE.Color(RARITIES[d.stack.rarity].color).getHex();
+    this.fliers.push({ mesh, t: 0, from: mesh.position.clone(), ch, color });
+  }
+
+  updateFliers(dt) {
+    const F = this.fliers;
+    for (let i = F.length - 1; i >= 0; i--) {
+      const f = F[i];
+      f.t += dt;
+      const k = Math.min(1, f.t / 0.3), e = k * k;
+      const ch = f.ch;
+      _tmp.set(ch.pos.x, ch.pos.y + 1.15, ch.pos.z);
+      f.mesh.position.lerpVectors(f.from, _tmp, e);
+      f.mesh.scale.setScalar(Math.max(0.05, 1 - e * 0.9));
+      f.mesh.userData.model.rotation.y += dt * 14;
+      if (k >= 1) {
+        this.game.fx.pickup(_tmp, f.color);
+        this.group.remove(f.mesh);
+        F[i] = F[F.length - 1];
+        F.pop();
+      }
+    }
   }
 
   // ---- chests ------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -246,6 +282,11 @@ export class LootManager {
       if (d.cell !== key(Math.floor(d.pos.x / CELL), Math.floor(d.pos.z / CELL))) { this.cellRemove(d); this.cellAdd(d); }
       if (d.mesh) d.mesh.position.copy(d.pos);
     }
+    this.updateFliers(dt);
+    // gentle shimmer on the shared beam / glow materials
+    const pulse = Math.sin(time * 3);
+    for (const k in beamMats) { beamMats[k].opacity = 0.38 + 0.07 * pulse; discMats[k].opacity = 0.45 + 0.1 * pulse; }
+    CHEST_GLOW_MAT.opacity = 0.35 + 0.1 * Math.sin(time * 2.2);
     // visual streaming
     const R = this.visualRadius, R2 = R * R, keepR2 = (R + 25) * (R + 25);
     let budget = 6;
@@ -258,8 +299,13 @@ export class LootManager {
         m.userData.model.rotation.y += dt * 1.4;
         m.userData.model.position.y = 0.6 + Math.sin(time * 2 + d.id) * 0.08;
         m.position.copy(d.pos);
+        const age = time - m.userData.t0;
+        if (age < 0.4) { const u = age / 0.4 - 1; m.scale.setScalar(Math.max(0.01, 1 + 2.7 * u * u * u + 1.7 * u * u)); } // pop in with a little overshoot
+        else if (m.scale.x !== 1) m.scale.setScalar(1);
       } else if (dd < R2 && budget > 0) {
         d.mesh = this.makeDropMesh(d);
+        d.mesh.userData.t0 = time;
+        d.mesh.scale.setScalar(0.01);
         d.mesh.position.copy(d.pos);
         this.group.add(d.mesh);
         budget--;
@@ -270,13 +316,16 @@ export class LootManager {
       const dd = dx * dx + dz * dz;
       if (c.mesh) {
         if (dd > (R + 40) ** 2) { this.group.remove(c.mesh); c.mesh = null; continue; }
-        const lidTarget = c.opened ? -1.95 : 0;
-        c.lidT += (lidTarget - c.lidT) * Math.min(1, dt * 8);
+        if (c.opened) {
+          // spring the lid open: it swings a little past its stop and settles
+          c.lidV = (c.lidV || 0) + ((-1.95 - c.lidT) * 140 - (c.lidV || 0) * 12) * dt;
+          c.lidT = Math.max(-2.35, c.lidT + c.lidV * dt);
+        } else c.lidT = 0;
         c.mesh.userData.lid.rotation.x = c.lidT;
         c.mesh.userData.glow.visible = !c.opened;
         if (c.beam) c.beam.visible = !c.opened;
         if (!c.opened && c.progress > 0 && time - (c.lastWork || 0) > 0.3) c.progress = Math.max(0, c.progress - dt * 2);
-        if (!c.opened) c.mesh.userData.lid.rotation.x = -c.progress * 0.25;
+        if (!c.opened) c.mesh.userData.lid.rotation.x = -c.progress * 0.25 + Math.sin(time * 70) * 0.014 * Math.min(1, c.progress * 2); // the lid strains and rattles while it is being opened
       } else if (dd < (R + 30) ** 2 && budget > 0) {
         c.mesh = chestModel();
         c.mesh.position.set(c.x, c.y, c.z);
@@ -332,6 +381,8 @@ export class LootManager {
     disc.position.y = 0.04;
     g.add(beam, disc);
     g.userData.model = inner;
+    g.userData.beam = beam;
+    g.userData.disc = disc;
     inner.traverse((o) => { if (o.isMesh) o.castShadow = false; });
     return g;
   }

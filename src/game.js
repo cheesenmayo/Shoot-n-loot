@@ -183,8 +183,7 @@ export class Game {
     this.dynPads = [];
     this.refreshPads();
     this.loot.clear();
-    this.fx.add.count = 0;
-    this.fx.alpha.count = 0;
+    this.fx.reset();
     this.storm.stop();
     this.bus.active = false;
     this.bus.group.visible = false;
