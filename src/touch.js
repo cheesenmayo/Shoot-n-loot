@@ -10,6 +10,7 @@ const ICONS = {
   pause: '<svg viewBox="0 0 48 48"><path d="M16 11v26M32 11v26" stroke="currentColor" stroke-width="6" stroke-linecap="round"/></svg>',
   map: '<svg viewBox="0 0 48 48"><path d="M24 43s-13-12-13-22a13 13 0 0 1 26 0c0 10-13 22-13 22z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/><circle cx="24" cy="21" r="4.5" fill="currentColor"/></svg>',
   next: '<svg viewBox="0 0 48 48"><path d="M17 11l14 13-14 13" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  sandbox: '<svg viewBox="0 0 48 48"><path d="M18 5h12M20 5v14L9 38.5A4.5 4.5 0 0 0 13 45h22a4.5 4.5 0 0 0 4-6.5L28 19V5" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 33h20" stroke="currentColor" stroke-width="3.6" stroke-linecap="round"/></svg>',
 };
 
 const STICK_R = 54; // px of finger travel for full deflection
@@ -37,6 +38,7 @@ export class TouchControls {
       <div class="stick" id="t-stick"><div class="knob"></div></div>
       <div class="tb tsmall top-l" data-btn="pause">${ICONS.pause}</div>
       <div class="tb tsmall top-l2" data-btn="map">${ICONS.map}</div>
+      <div class="tb tsmall top-l3" data-btn="sandbox">${ICONS.sandbox}</div>
       <div class="tb tfire" data-btn="fire">${ICONS.fire}</div>
       <div class="tb tjump" data-btn="jump">${ICONS.jump}<span>JUMP</span></div>
       <div class="tb tads" data-btn="ads">${ICONS.ads}</div>
@@ -113,7 +115,7 @@ export class TouchControls {
         case 'reload': s.reloadPressed = true; break;
         case 'interact': s.interactHeld = true; s.interactPressed = true; break;
         case 'next': s.nextPressed = true; break;
-        default: break; // pause / map fire on release
+        default: break; // pause / map / sandbox fire on release
       }
       return;
     }
@@ -177,6 +179,7 @@ export class TouchControls {
         case 'interact': s.interactHeld = false; break;
         case 'pause': this.game.pause(); break;
         case 'map': this.game.hud.toggleMap(); break;
+        case 'sandbox': this.game.sbx?.toggle(); break;
         default: break;
       }
     }
@@ -200,6 +203,7 @@ export class TouchControls {
     r.classList.toggle('dead', dead);
     r.classList.toggle('bus', bus);
     r.classList.toggle('air', air);
+    r.classList.toggle('sbx', this.game.sandbox);
     const target = !dead && !bus && !air ? ctrl.target : null;
     this.intEl.classList.toggle('show', !!target);
     if (target) {

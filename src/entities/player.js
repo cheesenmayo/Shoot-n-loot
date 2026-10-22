@@ -72,10 +72,12 @@ export class PlayerController {
     d.addEventListener('visibilitychange', () => { if (d.hidden) this.game.pause(); });
   }
 
-  requestLock() {
+  /** `quiet`: the request does not come from a user gesture (Esc), so a refusal is not an error: just hint at clicking. */
+  requestLock(quiet = false) {
     if (this.game.touchMode) return; // fingers, not a mouse: nothing to lock
     const fail = () => {
       if (this.fallbackLook) return;
+      if (quiet) { this.game.hud?.toast('Click the game to capture the mouse'); return; }
       this.fallbackLook = true;
       this.canvas.style.cursor = 'crosshair';
       this.game.hud?.toast('Pointer lock unavailable: move the mouse to look (arrow keys also turn)');
@@ -100,6 +102,7 @@ export class PlayerController {
     if (e.repeat) return;
     const g = this.game;
     if (code === 'Escape') { g.togglePause(); return; }
+    if (code === 'KeyB' && g.sandbox) { g.sbx.toggle(); return; } // sandbox tools (also closes the panel: input is off while it is open)
     if (!g.inputEnabled()) return;
     const ch = this.char;
     if (!ch) return;

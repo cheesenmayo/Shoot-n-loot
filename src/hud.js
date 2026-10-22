@@ -30,6 +30,7 @@ const TOUCHHELP = `
     <div><b>FIRE</b> hold to shoot · drag to aim</div><div><b>◎</b> aim down sights</div>
     <div><b>JUMP</b> jump · drop from the bus · glider</div><div><b>▼</b> crouch · <b>↻</b> reload</div>
     <div><b>PICK UP / OPEN</b> appears next to loot</div><div><b>Hotbar</b> tap to switch items</div>
+    <div><b>⏸</b> pause · <b>📍</b> map</div><div><b>⚗</b> sandbox tools (Sandbox mode)</div>
   </div>`;
 
 const KEYS = `
@@ -41,6 +42,7 @@ const KEYS = `
     <div><b>1-6 / Wheel</b> switch item</div><div><b>G</b> drop item</div>
     <div><b>M / Tab</b> map</div><div><b>X</b> swap shoulder · <b>V</b> first person</div>
     <div><b>← → ↑ ↓</b> look (no mouse lock)</div><div><b>Esc</b> pause</div>
+    <div><b>B</b> sandbox tools (Sandbox mode)</div><div><b>F3</b> show FPS</div>
   </div>`;
 
 export class HUD {
@@ -62,7 +64,7 @@ export class HUD {
         <div class="tagline">50 PLAYERS · 8 LOCATIONS · 1 VICTORY ROYALE</div>
         <div class="tagline" style="font-size:12px;opacity:.65"><span class="kb">Best on a desktop browser with keyboard and mouse</span><span class="tc">Touch controls are on · play in landscape</span></div>
         <div class="tagline" id="gfx-note" style="color:#7fe8ff"></div>
-        <button class="btn" id="btn-play">Play</button>
+        <div class="row"><button class="btn" id="btn-play">Play</button><button class="btn cyan" id="btn-sandbox">Sandbox</button></div>
         <div class="row" style="align-items:stretch">
           <div class="panel">${settingsHTML('t')}</div>
           <div class="panel"><div class="label">Controls</div>${KEYS}${TOUCHHELP}</div>
@@ -73,7 +75,7 @@ export class HUD {
     <div id="screen-pause" class="screen dim hidden">
       <div class="title-wrap">
         <div class="logo" style="font-size:56px">Paused</div>
-        <div class="row"><button class="btn" id="btn-resume">Resume</button><button class="btn alt" id="btn-quit">Leave match</button></div>
+        <div class="row"><button class="btn" id="btn-resume">Resume</button><button class="btn cyan small hidden" id="btn-sbx">Sandbox tools</button><button class="btn alt" id="btn-quit">Leave match</button></div>
         <div class="row" style="align-items:stretch">
           <div class="panel">${settingsHTML('p')}</div>
           <div class="panel"><div class="label">Controls</div>${KEYS}${TOUCHHELP}</div>
@@ -106,9 +108,10 @@ export class HUD {
       <div class="scope" id="scope"></div>
       <div class="feed" id="feed"></div>
       <div class="storm" id="storm"><span class="chip" id="storm-chip"><span id="storm-txt"></span></span></div>
+      <div class="sbxread hidden" id="sbx-read"><div class="chip"><span id="sbx-stats"></span></div><div class="sbxtags" id="sbx-tags"></div></div>
       <div class="topright">
         <div class="counters">
-          <div class="chip"><span>👥 <span id="alive">50</span></span></div>
+          <div class="chip" id="chip-alive"><span><span id="alive-ic">👥</span> <span id="alive">50</span></span></div>
           <div class="chip"><span>☠ <span id="kills">0</span></span></div>
         </div>
         <div class="minimap"><canvas id="minimap" width="200" height="200"></canvas></div>
@@ -194,7 +197,9 @@ export class HUD {
       });
     });
     this.$('#btn-play').addEventListener('click', () => { g.audio.init(); g.audio.play('click'); g.startMatch(); });
+    this.$('#btn-sandbox').addEventListener('click', () => { g.audio.init(); g.audio.play('click'); g.startSandbox(); });
     this.$('#btn-resume').addEventListener('click', () => { g.audio.play('click'); g.resume(); });
+    this.$('#btn-sbx').addEventListener('click', () => { g.audio.play('click'); g.resume(true); g.sbx.openPanel(); });
     this.$('#btn-quit').addEventListener('click', () => { g.audio.play('click'); g.returnToMenu(); });
     this.$('#btn-again').addEventListener('click', () => { g.audio.play('click'); g.startMatch(); });
     this.$('#btn-lobby').addEventListener('click', () => { g.audio.play('click'); g.returnToMenu(); });
@@ -227,6 +232,18 @@ export class HUD {
   }
 
   setNote(msg) { this.$('#gfx-note').textContent = msg; }
+
+  /** Sandbox flavour of the HUD: SANDBOX chip with the enemy count, damage readout, pause-menu wording. */
+  setSandbox(on) {
+    document.body.classList.toggle('sandbox', on);
+    this.$('#btn-quit').textContent = on ? 'Leave sandbox' : 'Leave match';
+    this.$('#btn-sbx').classList.toggle('hidden', !on);
+    this.$('#alive-ic').textContent = on ? 'SANDBOX ·' : '👥';
+    this.$('#chip-alive').title = on ? 'Enemies alive' : 'Players alive';
+    this.$('#sbx-read').classList.toggle('hidden', !on);
+    this.lastRead = '';
+    this.readT = 0;
+  }
 
   showHud(on) { this.$('#hud').classList.toggle('hidden', !on); }
 
@@ -343,8 +360,10 @@ export class HUD {
     const g = this.game, ch = g.player;
     if (!ch) return;
     const inMatch = g.state === 'bus' || g.state === 'playing' || g.state === 'dead' || g.state === 'ended';
-    this.$('#alive').textContent = g.aliveCount;
+    const sbx = g.sandbox ? g.sbx : null;
+    this.$('#alive').textContent = sbx ? sbx.liveCount() : g.aliveCount;
     this.$('#kills').textContent = ch.kills;
+    if (sbx) this.updateReadout(dt, sbx);
 
     // vitals
     const hp = Math.max(0, Math.ceil(ch.hp)), sh = Math.max(0, Math.ceil(ch.shield));
@@ -436,6 +455,22 @@ export class HUD {
     void inMatch;
   }
 
+  /** Sandbox damage readout (top centre) and a tag for every active cheat. */
+  updateReadout(dt, sbx) {
+    this.readT -= dt;
+    if (this.readT > 0) return;
+    this.readT = 0.2;
+    const n = (v) => Math.round(v).toLocaleString('en-US');
+    const s = sbx.stats, last = s.last;
+    const tags = [sbx.god && '🛡 GOD', sbx.infAmmo && '∞ AMMO', sbx.infItems && '∞ ITEMS', sbx.superSpeed && '⚡ SPEED', sbx.timeScale !== 1 && `⏱ ${sbx.timeScale}×`].filter(Boolean);
+    const html = `DMG <b>${n(s.total)}</b> · DPS <b>${n(sbx.dps())}</b> · LAST <b>${last ? n(last.v) + (last.head ? ' HEAD' : '') : '-'}</b>|${tags.map((t) => `<i>${t}</i>`).join('')}`;
+    if (html === this.lastRead) return;
+    this.lastRead = html;
+    const [a, b] = html.split('|');
+    this.$('#sbx-stats').innerHTML = a;
+    this.$('#sbx-tags').innerHTML = b;
+  }
+
   /** Little timers above the health bar for temporary boosts (Jumpple, Runana). */
   updateBuffs(ch) {
     const b = ch.buffs;
@@ -450,7 +485,10 @@ export class HUD {
 
   updateHotbar(ch) {
     const slots = ch.inv.slots;
-    let sig = ch.inv.sel + '|';
+    const sbx = this.game.sandbox ? this.game.sbx : null;
+    const infItems = !!sbx?.infItems, infAmmo = !!sbx?.infAmmo;
+    const stackable = (d) => d.kind === 'consume' || d.kind === 'throw' || d.kind === 'gadget';
+    let sig = ch.inv.sel + (infItems ? 'i' : '') + (infAmmo ? 'a' : '') + '|';
     for (const s of slots) sig += s ? `${s.def.id}:${s.count}:${s.rarity}:${s.mag ?? ''};` : '-;';
     if (sig !== this.lastHot) {
       this.lastHot = sig;
@@ -458,7 +496,7 @@ export class HUD {
       slots.forEach((s, i) => {
         if (!s) { html += `<div class="slot empty" data-i="${i}"><span class="n">${i + 1}</span></div>`; return; }
         const col = RARITIES[s.rarity].css;
-        html += `<div class="slot ${i === ch.inv.sel ? 'sel' : ''}" data-i="${i}"><span class="n">${i + 1}</span><span class="ic">${s.def.icon}</span>${s.count > 1 || s.def.kind === 'gadget' ? `<span class="cnt">${s.count}</span>` : ''}<span class="nm">${s.def.id === 'pickaxe' ? '' : s.def.name}</span><span class="rar" style="background:${s.def.id === 'pickaxe' ? 'transparent' : col}"></span></div>`;
+        html += `<div class="slot ${i === ch.inv.sel ? 'sel' : ''}" data-i="${i}"><span class="n">${i + 1}</span><span class="ic">${s.def.icon}</span>${s.count > 1 || s.def.kind === 'gadget' ? `<span class="cnt">${infItems && stackable(s.def) ? '∞' : s.count}</span>` : ''}<span class="nm">${s.def.id === 'pickaxe' ? '' : s.def.name}</span><span class="rar" style="background:${s.def.id === 'pickaxe' ? 'transparent' : col}"></span></div>`;
       });
       this.$('#hotbar').innerHTML = html;
     }
@@ -468,8 +506,8 @@ export class HUD {
     if (st) {
       const d = st.def;
       const col = RARITIES[st.rarity].css;
-      if (d.kind === 'gun') html = `<div class="big">${st.mag}<small> / ${ch.inv.ammo[d.ammo]}</small></div><div class="wn" style="color:${col}">${d.name}</div>`;
-      else if (d.id !== 'pickaxe') html = `<div class="big">${st.count}</div><div class="wn" style="color:${col}">${d.name}</div>`;
+      if (d.kind === 'gun') html = `<div class="big">${st.mag}<small> / ${infAmmo ? '∞' : ch.inv.ammo[d.ammo]}</small></div><div class="wn" style="color:${col}">${d.name}</div>`;
+      else if (d.id !== 'pickaxe') html = `<div class="big">${infItems && stackable(d) ? '∞' : st.count}</div><div class="wn" style="color:${col}">${d.name}</div>`;
       else html = `<div class="wn">${d.name}</div>`;
     }
     if (html !== this.lastAmmo) { a.innerHTML = html; this.lastAmmo = html; }
@@ -561,6 +599,18 @@ export class HUD {
         ctx.strokeText(p.name, x, y - 14);
         ctx.fillStyle = '#fff';
         ctx.fillText(p.name, x, y - 14);
+      }
+    }
+    // sandbox enemies show up as red dots
+    if (g.sandbox) {
+      ctx.fillStyle = '#ff4a4a';
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = big ? 2 : 1;
+      for (const e of g.sbx.enemies) {
+        if (!e.ch.alive) continue;
+        const x = toX(e.ch.pos.x), y = toY(e.ch.pos.z);
+        if (!big && (x < -4 || y < -4 || x > 204 || y > 204)) continue;
+        ctx.beginPath(); ctx.arc(x, y, big ? 6 : 3.2, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       }
     }
   }
