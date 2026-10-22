@@ -245,7 +245,7 @@ export class Character {
     let l = Math.hypot(dx, dz);
     if (l < 0.01) { const a = (this.seed * 2.399) % 6.283; dx = Math.sin(a); dz = Math.cos(a); l = 1; }
     dx /= l; dz /= l;
-    const power = info.explosive ? 1 : info.melee ? 0.8 : Math.min(1, 0.3 + (this.stats.damageTaken || 0) * 0 + (info.weapon?.dmg || 20) / 120);
+    const power = info.explosive ? 1 : info.melee ? 0.8 : Math.min(1, 0.3 + (info.weapon?.dmg || 20) / 120);
     this.anim.event('die', { dx: dx * cy - dz * sy, dz: dx * sy + dz * cy, power, headshot: !!info.headshot, airborne: wasAir });
     this.deadGround = !wasAir;
     this.deadWater = this.swimming;
@@ -805,7 +805,7 @@ export class Character {
       v.x *= k; v.z *= k;
       p.y = w.collision.groundAt(p.x, p.z, p.y + 0.2, PHYS.step);
     }
-    if (this.deadWater) p.y = Math.max(p.y, WORLD.seaLevel - 1.0) - 0.02 * 0;
+    if (this.deadWater) p.y = Math.max(p.y, WORLD.seaLevel - 1.0);
   }
 
   updateDead(dt) {

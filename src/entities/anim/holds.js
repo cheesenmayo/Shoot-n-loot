@@ -47,6 +47,7 @@ export class Hold {
     this.bolt = 0; this.pump = 0; this.lever = 0; this.slide = 0; this.hammer = 0; this.cyl = 0; this.magPart = 0;
     this.fkSwing = 0; // how much the free arm swing contributes to the item hand
     this.gripAxis = 0;
+    this.wrist = 1.3; // how far the wrist may bend (rad)
   }
 }
 
@@ -288,12 +289,12 @@ function reloadHold(H, A, def, info, k) {
 const rowsFrom = (rest, rows) => [[0, ...rest], ...rows, [1, ...rest]];
 const PICK_REST = [0.24, 0.3, -0.14, 2.5, -0.1, 0.2, 0.1, 0.0, 0];
 const MACH_REST = [0.3, 0.22, -0.2, 0.95, 0, 0, 0.1, 0, 0];
-const BAT_REST = [0.3, 0.45, -0.1, 2.0, -0.1, 0.1, 0.1, 0.0, 0];
+const BAT_REST = [0.28, 0.4, -0.08, 2.35, -0.1, 0.1, 0.1, 0.0, 0];
 const KAT_REST = [0.24, 0.24, -0.26, 1.0, -0.2, 0.1, 0.12, 0.0, 0];
 const SLEDGE_REST = [0.3, 0.4, -0.05, 2.3, -0.1, 0.1, 0.1, 0.0, 0];
 export const MELEE = {
   pickaxe: {
-    two: true, grip: [0, 0, 0.1], offQ: [-0.35, 0, 0],
+    two: true, grip: [0, 0, 0.1], offQ: [-1.1, 0, 0],
     rest: PICK_REST, carry: [0.26, 0.2, -0.2, 1.25, 0.1, 0, 0, 0, 0],
     swing: rowsFrom(PICK_REST, [
       [0.1, 0.28, 0.5, -0.06, 2.75, -0.1, 0.15, 0.18, -0.08, -0.01], [0.22, 0.2, 0.8, 0.04, 2.95, -0.1, 0.1, 0.24, -0.2, -0.03],
@@ -302,7 +303,7 @@ export const MELEE = {
     ]),
   },
   machete: {
-    two: false, grip: [0, 0, 0], offQ: [-0.1, 0, 0],
+    two: false, grip: [0, 0, 0], offQ: [-1.0, 0, 0],
     rest: MACH_REST, carry: [0.26, 0.15, -0.16, 0.7, 0, 0, 0, 0, 0],
     swing: rowsFrom(MACH_REST, [
       [0.1, 0.34, 0.44, -0.14, 1.2, -0.4, -0.3, -0.25, -0.03, 0], [0.22, 0.38, 0.66, -0.1, 1.5, -0.75, -0.5, -0.5, -0.08, -0.01],
@@ -311,7 +312,7 @@ export const MELEE = {
     ]),
   },
   bat: {
-    two: true, grip: [0, 0, 0.1], offQ: [-0.25, 0, 0],
+    two: true, grip: [0, 0, 0.1], offQ: [-1.1, 0, 0],
     rest: BAT_REST, carry: [0.26, 0.22, -0.2, 1.3, 0.1, 0, 0, 0, 0],
     swing: rowsFrom(BAT_REST, [
       [0.1, 0.3, 0.5, 0.0, 1.0, -1.1, 0.1, -0.35, 0, -0.01], [0.22, 0.28, 0.5, 0.1, 0.3, -1.9, 0.1, -0.8, 0, -0.03],
@@ -320,7 +321,7 @@ export const MELEE = {
     ]),
   },
   katana: {
-    two: true, grip: [0, 0, 0.1], offQ: [-0.3, 0, 0],
+    two: true, grip: [0, 0, 0.1], offQ: [-1.0, 0, 0],
     rest: KAT_REST, carry: [0.22, 0.2, -0.26, 0.9, -0.15, 0, 0.1, 0, 0],
     swing: rowsFrom(KAT_REST, [
       [0.1, 0.3, 0.48, -0.2, 1.25, -0.4, 0.2, -0.25, -0.02, 0], [0.22, 0.34, 0.66, -0.12, 1.45, -0.55, 0.3, -0.4, -0.03, 0],
@@ -334,7 +335,7 @@ export const MELEE = {
     ]),
   },
   sledge: {
-    two: true, grip: [0, 0, 0.1], offQ: [-0.35, 0, 0],
+    two: true, grip: [0, 0, 0.1], offQ: [-1.1, 0, 0],
     rest: SLEDGE_REST, carry: [0.26, 0.2, -0.22, 1.35, 0.1, 0, 0, 0, 0],
     swing: rowsFrom(SLEDGE_REST, [
       [0.1, 0.22, 0.6, 0.02, 2.8, -0.1, 0.1, 0.15, -0.15, -0.02], [0.22, 0.12, 0.88, 0.12, 3.1, 0, 0, 0.2, -0.32, -0.05],
@@ -356,12 +357,14 @@ function setPose(H, A, row, o) {
 function meleeHold(H, A, def, info, st) {
   const sp = meleeSpec(def.id);
   H.offQ.setFromEuler(_e.set(sp.offQ[0], sp.offQ[1], sp.offQ[2]));
-  H.rw = 1;
+  H.rw = 1; H.wrist = 2.0;
   const swing = A.swingK >= 0;
   const moving = A.sSprint;
   if (swing) {
     const track = def.id === 'katana' && (A.swingCount & 1) ? sp.swing2 : sp.swing;
-    sampleKeys(track, A.swingK, _s, 9);
+    // the arms lag the target by a few frames, so the table is sampled slightly ahead to land the impact on time
+    const k = A.swingK, ke = Math.min(1, k + 0.05 * ease.smooth(k / 0.2) * (1 - ease.smooth((k - 0.6) / 0.3)));
+    sampleKeys(track, ke, _s, 9);
     H.wp.set(_s[0], _s[1], _s[2]);
     qe(H.wq, _s[3], _s[4], _s[5]);
     H.spineY = _s[6]; H.spineX = _s[7]; H.stepZ = _s[8];
@@ -386,7 +389,7 @@ function meleeHold(H, A, def, info, st) {
     H.spineY = lerp(r[6], c[6], k);
   }
   H.fkSwing = 0.5;
-  H.lq.setFromEuler(_e.set(0, 0, 0));
+  H.lq.copy(H.offQ).invert(); // both hands grip the handle the same way
 }
 
 // ---------------------------------------------------------------------------
@@ -462,6 +465,7 @@ const _m2 = new THREE.Vector3();
 
 function consumeHold(H, A, def, info) {
   const u = A.using;
+  H.wrist = 1.9;
   const k = clamp(u.t / u.dur, 0, 1);
   H.rw = 1; H.lw = 0; H.lAbs = false;
   H.offQ.copy(Q_FRUIT);
@@ -591,7 +595,7 @@ export function computeHold(A) {
   H.headX = H.headY = H.headZ = 0; H.lookW = 1;
   H.itemVisible = true; H.itemScale = 1;
   H.magProp = 0; H.bolt = H.pump = H.lever = H.slide = H.hammer = H.cyl = H.magPart = 0;
-  H.fkSwing = 0;
+  H.fkSwing = 0; H.wrist = 1.3;
   H.rPole.set(0.5, -1, 0.4); H.lPole.set(-0.5, -1, 0.4);
   H.lq.identity();
   if (!def || !info) return;

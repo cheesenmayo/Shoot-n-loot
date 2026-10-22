@@ -8,6 +8,7 @@ import * as THREE from 'three';
 const _d = new THREE.Vector3();
 const _n = new THREE.Vector3();
 const _e = new THREE.Vector3();
+const _n2 = new THREE.Vector3();
 const _u = new THREE.Vector3();
 const _v = new THREE.Vector3();
 const _b = new THREE.Vector3();
@@ -48,7 +49,7 @@ export function quatFromBasis(out, x, y, z) {
  * Writes the upper bone orientation into outQ and the (positive) flexion angle into IK.flex; the lower
  * bone's local rotation is then R_x(-zSign * flex).
  */
-export function solveTwoBone(outQ, S, T, pole, l1, l2, zSign) {
+export function solveTwoBone(outQ, S, T, pole, l1, l2, zSign, pole2 = null) {
   _d.subVectors(T, S);
   let L = _d.length();
   if (L < 1e-5) { _d.set(0, -1, 0); L = 1e-5; } else _d.multiplyScalar(1 / L);
@@ -57,9 +58,21 @@ export function solveTwoBone(outQ, S, T, pole, l1, l2, zSign) {
   // elbow: on the circle around the S-T axis, pushed toward the pole
   const a = (l1 * l1 - l2 * l2 + Lc * Lc) / (2 * Lc);
   const h = Math.sqrt(Math.max(0, l1 * l1 - a * a));
-  _n.copy(pole);
+  _n.copy(pole).normalize();
   _n.addScaledVector(_d, -_n.dot(_d));
   let nl = _n.length();
+  if (pole2 && nl < 0.5) {
+    // the limb points (nearly) along the pole: the elbow direction would flip, so fade to a second pole
+    const w = nl <= 0.12 ? 0 : (nl - 0.12) / 0.38;
+    const ww = w * w * (3 - 2 * w);
+    _n2.copy(pole2).normalize();
+    _n2.addScaledVector(_d, -_n2.dot(_d));
+    const l2n = _n2.length();
+    if (l2n > 1e-4) {
+      _n.multiplyScalar(nl > 1e-6 ? ww / nl : 0).addScaledVector(_n2, (1 - ww) / l2n);
+      nl = _n.length();
+    }
+  }
   if (nl < 1e-4) {
     if (Math.abs(_d.x) < 0.9) _n.set(1, 0, 0); else _n.set(0, 0, 1);
     _n.addScaledVector(_d, -_n.dot(_d));

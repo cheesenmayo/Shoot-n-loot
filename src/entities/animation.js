@@ -34,7 +34,7 @@ const _S = new THREE.Vector3(), _T = new THREE.Vector3();
 const _Q1 = new THREE.Quaternion(), _Q2 = new THREE.Quaternion(), _Q3 = new THREE.Quaternion(), _Q4 = new THREE.Quaternion();
 const _wp = new THREE.Vector3(), _wq = new THREE.Quaternion();
 const _hp = new THREE.Vector3(), _hq = new THREE.Quaternion();
-const _pole = new THREE.Vector3();
+const _pole = new THREE.Vector3(), _pole2 = new THREE.Vector3();
 const _tp = new THREE.Vector3(), _tq = new THREE.Quaternion();
 const ID = new THREE.Quaternion();
 const UP = new THREE.Vector3(0, 1, 0);
@@ -75,6 +75,7 @@ export class Animator {
     // smoothed hand targets
     this.cwp = new THREE.Vector3(0.2, 0.2, -0.2); this.cwq = new THREE.Quaternion();
     this.clp = new THREE.Vector3(); this.clq = new THREE.Quaternion();
+    this.limQ = []; for (let i = 0; i < 6; i++) this.limQ.push(new THREE.Quaternion()); this.limInit = false; this.dtLast = 0.016;
     this.overL = 0; this.overR = 0; // how far the last hand targets were beyond the arm's reach
     this.lAbsPrev = false; this.wpLast = new THREE.Vector3(); this.wqLast = new THREE.Quaternion();
     this.qAim = new THREE.Quaternion(); this.qAimEff = new THREE.Quaternion();
@@ -216,6 +217,7 @@ export class Animator {
     this.snapP[0].copy(J[0].position);
     this.snapP[1].copy(J[1].position);
     this.xf = this.xfDur = XFADE[f];
+    this.limInit = false;
     this.family = f;
     if (f === FAMILY.DANCE) this.danceT0 = this.t;
   }
@@ -428,7 +430,8 @@ export class Animator {
       _S.set(side * RIG.hipX, 0, 0);
       _T.copy(L.tgt[i]).sub(_v.set(px, py, pz)).applyQuaternion(_Q1);
       _pole.set(side * 0.16, 0, -1);
-      solveTwoBone(_Q2, _S, _T, _pole, RIG.thigh, RIG.shin, 1);
+      _pole2.set(side * 1, 0, -0.2);
+      solveTwoBone(_Q2, _S, _T, _pole, RIG.thigh, RIG.shin, 1, _pole2);
       const flex = IK.flex;
       // foot orientation: flat on the ground, pitching with the stride, toes slightly out (expressed in pelvis space)
       qeul(_Q3, L.pitch[i], side * -0.1, 0);
@@ -473,6 +476,7 @@ export class Animator {
     const ch = this.ch, m = this.m, X = this.X, V = this.V, H = this.hold;
     const def = this.heldDef;
     const t = this.t;
+    this.dtLast = dt;
     const aimW = this.sAim, sp = this.sSprint;
     const relYaw = wrapAngle(ch.yaw - ch.bodyYaw);
     const gunAim = def && (def.kind === 'gun' || def.kind === 'gadget');
@@ -563,7 +567,24 @@ export class Animator {
       _pole.copy(H.lPole);
       this.arm(m.armL, -1, SL, _tp, _tq, _pole, lw);
     } else this.arm(m.armL, -1, SL, _tp, null, _pole, 0);
+    this.limitArms(dt);
     this.applyItem(dt);
+  }
+
+  /** Safety net against single-frame pops: no arm joint may turn faster than a (very quick) swing. */
+  limitArms(dt) {
+    const m = this.m, Q = this.limQ;
+    const maxStep = 3000 * Math.PI / 180 * dt;
+    const J = [m.armR.a, m.armR.fore, m.armR.hand, m.armL.a, m.armL.fore, m.armL.hand];
+    for (let i = 0; i < 6; i++) {
+      const q = J[i].quaternion, prev = Q[i];
+      if (this.limInit) {
+        const ang = 2 * Math.acos(Math.min(1, Math.abs(q.dot(prev))));
+        if (ang > maxStep) { prev.slerp(q, maxStep / ang); q.copy(prev); continue; }
+      }
+      prev.copy(q);
+    }
+    this.limInit = true;
   }
 
   /** Writes one arm: blends the free (swinging) pose with the IK pose by weight w. */
@@ -590,9 +611,10 @@ export class Animator {
       arm.hand.quaternion.identity();
       return;
     }
-    solveTwoBone(_Q2, S, T, pole, UA, FA, -1);
+    _pole2.set(side * 0.9, 0.0, 0.45);
+    solveTwoBone(_Q2, S, T, pole, UA, FA, -1, _pole2);
     const f2 = IK.flex;
-    if (qHand) endLocal(_Q4, _Q2, f2, -1, qHand, 1.25); else _Q4.identity();
+    if (qHand) endLocal(_Q4, _Q2, f2, -1, qHand, this.hold.wrist); else _Q4.identity();
     if (w >= 0.9995) {
       arm.a.quaternion.copy(_Q2);
       arm.fore.quaternion.setFromAxisAngle(AX, f2);
