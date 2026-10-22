@@ -7,6 +7,7 @@ import { POIS } from './poidata.js';
 import { Builder } from './builder.js';
 import { buildAllPois } from './pois/index.js';
 import { makeTextures } from '../textures.js';
+import { Ambient } from './ambient.js';
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
@@ -24,7 +25,7 @@ export class World {
     this.poiGroups = [];
     this.pois = POIS;
     this.extraLabels = [];
-    this.windFlags = [];
+    this.smokeSources = [];
     this.nearbyChecks = null;
   }
 
@@ -61,6 +62,7 @@ export class World {
 
     await step('Finishing touches', 0.95);
     this.indexBuildings();
+    this.ambient = new Ambient(this);
     this.mapRects = this.mapRects || [];
     onProgress('Ready', 1);
   }
@@ -103,6 +105,7 @@ export class World {
     this.scene.add(g);
     this.poiGroups.push(g);
     this.jumpPads.push(...b.jumpPads);
+    this.smokeSources.push(...b.smokes);
     return g;
   }
 
@@ -196,10 +199,12 @@ export class World {
     const w = this.water.userData.water;
     this.water.position.x = Math.round(camera.position.x / 100) * 100;
     this.water.position.z = Math.round(camera.position.z / 100) * 100;
+    this.water.userData.waterTime.value = time;
     const nm = w.material.normalMap;
     nm.offset.x = (time * 0.004) % 1;
     nm.offset.y = (time * 0.0027) % 1;
     for (const a of this.animated) a.update(dt, time);
+    this.ambient.update(camera, dt, time);
   }
 
   applyGraphics(g) {
@@ -217,9 +222,10 @@ export class World {
     this.terrain.setDetailNormals(g.detailNormals);
     this.scene.environmentIntensity = g.envMap ? 0.55 : 0.25;
     this.props.setQuality(g);
+    this.ambient?.setQuality(g);
     this.water.userData.water.material.normalScale.setScalar(g.detailNormals ? 0.7 : 0.4);
     // shadow toggles change the shader programs; refresh the shared materials once
-    const mats = [...Object.values(this.mats), this.terrain.material, this.props.treeMat, this.props.rockMat, this.props.grassMat];
+    const mats = [...Object.values(this.mats), this.terrain.material, this.props.treeMat, this.props.rigidMat, this.props.rockMat, this.props.grassMat];
     for (const m of mats) m.needsUpdate = true;
   }
 }

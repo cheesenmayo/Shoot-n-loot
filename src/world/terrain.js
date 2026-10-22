@@ -430,6 +430,18 @@ export function createWater(textures) {
     depthWrite: false,
     envMapIntensity: 1.6,
   });
+  // a second, finer ripple layer drifting the other way gives the surface its shimmer and sun glints
+  const waterT = { value: 0 };
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uWaterT = waterT;
+    shader.fragmentShader = 'uniform float uWaterT;\n' + shader.fragmentShader.replace(
+      '#include <normal_fragment_maps>',
+      THREE.ShaderChunk.normal_fragment_maps.replace(
+        'texture2D( normalMap, vNormalMapUv )',
+        '( texture2D( normalMap, vNormalMapUv ) * 0.58 + texture2D( normalMap, vNormalMapUv * 2.7 + vec2( uWaterT * 0.024, - uWaterT * 0.017 ) ) * 0.42 )',
+      ),
+    );
+  };
   const water = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000, 1, 1).rotateX(-Math.PI / 2), mat);
   water.position.y = WORLD.seaLevel - 0.05;
   water.renderOrder = 2;
@@ -440,5 +452,6 @@ export function createWater(textures) {
   abyss.position.y = -36;
   group.add(abyss, water);
   group.userData.water = water;
+  group.userData.waterTime = waterT;
   return group;
 }

@@ -107,6 +107,7 @@ export class Game {
     this.world = new World(this.renderer, this.scene);
     await this.world.build((label, p) => this.hud.loading(label, p));
     this.fx = new FX(this.scene, this.world.textures, this);
+    this.world.ambient.attachFx(this.fx);
     this.combat = new Combat(this);
     this.loot = new LootManager(this);
     this.storm = new Storm(this);

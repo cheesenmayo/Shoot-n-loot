@@ -352,6 +352,7 @@ export class Builder {
     this.buildings = []; // nav info for bots
     this.jumpPads = [];
     this.animated = []; // {obj, update(dt)} meshes added separately by the poi
+    this.smokes = []; // chimneys and campfires: {x, y, z, kind} (the ambient layer emits smoke there)
     this.meshes = []; // extra non-batched objects
     this.lights = [];
   }
@@ -677,6 +678,7 @@ export class Builder {
         const cx = x1 - 1.2, cz = o.z;
         this.solid.box(cx - 0.45, y0 - 0.5, cz - 0.45, cx + 0.45, wallTop + rise + 1.0, cz + 0.45, 0x80766c, { ao: 0.85 });
         this.col.addBox(cx - 0.45, y0, cz - 0.45, cx + 0.45, wallTop + rise + 1.0, cz + 0.45);
+        this.smokes.push({ x: cx, y: wallTop + rise + 1.1, z: o.z, kind: 'chimney' });
       }
     }
 

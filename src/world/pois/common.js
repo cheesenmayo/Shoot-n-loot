@@ -162,6 +162,7 @@ export function campfire(b, x, z, y = null) {
   }
   b.glow.blob(x, y0 + 0.5, z, 0.45, 0.55, 0.45, 0xff9a2a, { seg: 6, rings: 3, wobble: 0.15, ao: 1 });
   b.glow.blob(x, y0 + 0.75, z, 0.25, 0.4, 0.25, 0xffe06a, { seg: 5, rings: 3, wobble: 0.1, ao: 1 });
+  b.smokes.push({ x, y: y0 + 1.1, z, kind: 'fire' });
   for (let i = 0; i < 4; i++) {
     const a = (i / 4) * Math.PI * 2 + 0.4;
     b.box(x + Math.cos(a) * 2.3, y0, z + Math.sin(a) * 2.3, 1.2, 0.45, 0.45, 0x6a4a2e, { jit: 0.1 });

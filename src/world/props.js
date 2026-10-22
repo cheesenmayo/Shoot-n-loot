@@ -161,6 +161,22 @@ export class Props {
     this.time = { value: 0 };
 
     this.treeMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0 });
+    // rigid things (cacti, dead trunks) share the look of the trees but do not sway in the wind
+    this.rigidMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0 });
+    // trees and bushes lean with the wind: displacement grows with height squared, phase differs per instance, and a slow gust modulates it
+    this.treeMat.onBeforeCompile = (shader) => {
+      shader.uniforms.uTime = this.time;
+      shader.vertexShader = 'uniform float uTime;\n' + shader.vertexShader.replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+         #ifdef USE_INSTANCING
+           float ph = instanceMatrix[3].x * 0.17 + instanceMatrix[3].z * 0.13;
+           float gust = 0.65 + 0.35 * sin(uTime * 0.35 + ph * 0.3);
+           float sw = (sin(uTime * 1.25 + ph) + 0.45 * sin(uTime * 2.9 + ph * 1.9)) * gust * 0.0011 * position.y * position.y;
+           transformed.x += sw; transformed.z += sw * 0.55;
+         #endif`,
+      );
+    };
     this.rockMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0, map: textures.grain });
     this.rockMat.flatShading = false;
     this.grassMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, side: THREE.FrontSide });
@@ -182,9 +198,9 @@ export class Props {
       pineSnow: { geo: pineGeo(true), mat: this.treeMat, trunk: 0.38, h: 14 },
       oak: { geo: oakGeo(), mat: this.treeMat, trunk: 0.5, h: 9 },
       palm: { geo: palmGeo(), mat: this.treeMat, trunk: 0.32, h: 9 },
-      cactus: { geo: cactusGeo(0), mat: this.treeMat, trunk: 0.5, h: 4 },
-      cactus2: { geo: cactusGeo(1), mat: this.treeMat, trunk: 0.5, h: 5 },
-      dead: { geo: deadTreeGeo(), mat: this.treeMat, trunk: 0.3, h: 4 },
+      cactus: { geo: cactusGeo(0), mat: this.rigidMat, trunk: 0.5, h: 4 },
+      cactus2: { geo: cactusGeo(1), mat: this.rigidMat, trunk: 0.5, h: 5 },
+      dead: { geo: deadTreeGeo(), mat: this.rigidMat, trunk: 0.3, h: 4 },
       orange: { geo: orangeTreeGeo(), mat: this.treeMat, trunk: 0.3, h: 6 },
       rockS: { geo: rockGeo(0), mat: this.rockMat, trunk: 1.0, h: 1.4, rock: true },
       rockM: { geo: rockGeo(1), mat: this.rockMat, trunk: 1.5, h: 2.2, rock: true },
