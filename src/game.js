@@ -313,7 +313,7 @@ export class Game {
   }
   pause() {
     if (this.paused || !['bus', 'playing', 'dead', 'ended'].includes(this.state)) return;
-    if (this.sbx?.open) this.sbx.closePanel(true);
+    if (this.sbx?.open) this.sbx.closePanel(true, false);
     this.pauseChangedAt = performance.now();
     this.paused = true;
     this.touch.setActive(false);

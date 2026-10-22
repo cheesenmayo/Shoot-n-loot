@@ -12,8 +12,8 @@ const TOGGLES = [
   ['superSpeed', 'Super speed', 'Run almost twice as fast'],
 ];
 
-const seg = (opt, entries) => `<div class="seg sbx-seg" data-opt="${opt}">${entries.map(([v, label]) => `<button data-v="${v}">${label}</button>`).join('')}</div>`;
-const rarityRow = () => `<div class="sbx-rar" data-opt="rarity">${RARITIES.map((r, i) => `<button data-v="${i}" style="--c:${r.css}"><i></i>${r.name}</button>`).join('')}</div>`;
+const seg = (opt, entries) => `<div class="seg sbx-seg" data-opt="${opt}">${entries.map(([v, label]) => `<button data-val="${v}">${label}</button>`).join('')}</div>`;
+const rarityRow = () => `<div class="sbx-rar" data-opt="rarity">${RARITIES.map((r, i) => `<button data-val="${i}" style="--c:${r.css}"><i></i>${r.name}</button>`).join('')}</div>`;
 const fmt = (n) => Math.round(n).toLocaleString('en-US');
 
 export class SandboxPanel {
@@ -97,7 +97,7 @@ export class SandboxPanel {
     this.el.addEventListener('click', (e) => {
       const seg = e.target.closest('[data-opt] button');
       if (seg && this.el.contains(seg)) {
-        const opt = seg.parentElement.closest('[data-opt]').dataset.opt, raw = seg.dataset.v;
+        const opt = seg.parentElement.closest('[data-opt]').dataset.opt, raw = seg.dataset.val;
         g.audio.play('click');
         if (opt === 'time') sbx.setTimeScale(Number(raw));
         else sbx.setCfg(opt, ['rarity', 'count'].includes(opt) ? Number(raw) : raw);
@@ -147,6 +147,7 @@ export class SandboxPanel {
   show() {
     this.sync();
     this.el.classList.add('on');
+    document.body.classList.add('sbxopen');
     this.insetHud(true);
     if (!this.iconsStarted) {
       this.iconsStarted = true;
@@ -160,6 +161,7 @@ export class SandboxPanel {
 
   hide() {
     this.el.classList.remove('on');
+    document.body.classList.remove('sbxopen');
     this.insetHud(false);
     const a = document.activeElement;
     if (a && this.el.contains(a)) a.blur();
@@ -168,7 +170,7 @@ export class SandboxPanel {
   /** Reflect the sandbox state (options, toggles, counts) in the controls. */
   sync() {
     const sbx = this.sbx, c = sbx.cfg;
-    const set = (sel, v) => this.$$(sel).forEach((el) => el.classList.toggle('on', el.dataset.v === String(v)));
+    const set = (sel, v) => this.$$(sel).forEach((el) => el.classList.toggle('on', el.dataset.val === String(v)));
     this.$$('.sbx-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.id === c.tab));
     this.$$('[data-pane]').forEach((s) => { s.hidden = s.dataset.pane !== c.tab; });
     set('[data-opt=rarity] button', c.rarity);

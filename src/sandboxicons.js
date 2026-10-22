@@ -15,9 +15,7 @@ for (let i = 0; i < 256; i++) {
 
 export const iconCached = (id) => cache.get(id) || null;
 
-const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
-
-/** Renders thumbnails for `ids` (a few per frame). `onIcon(id, dataUrl)` fires as each one is ready. */
+/** Renders thumbnails for `ids` one after another. `onIcon(id, dataUrl)` fires as each one is ready. */
 export async function renderIcons(game, ids, onIcon) {
   const todo = ids.filter((id) => !cache.has(id));
   if (!todo.length) return;
@@ -60,9 +58,9 @@ export async function renderIcons(game, ids, onIcon) {
       r.setClearColor(0x000000, 0);
       r.clear();
       r.render(scene, cam);
-      r.readRenderTargetPixels(rt, 0, 0, W, H, px);
       r.setRenderTarget(prevTarget);
       r.setClearColor(prevColor, prevAlpha);
+      await r.readRenderTargetPixelsAsync(rt, 0, 0, W, H, px); // async readback: no GPU stall while the game keeps rendering
       // bottom-up -> top-down, linear -> sRGB
       for (let y = 0; y < H; y++) {
         const src = (H - 1 - y) * W * 4, dst = y * W * 4;
@@ -78,7 +76,6 @@ export async function renderIcons(game, ids, onIcon) {
       cache.set(id, url);
       scene.remove(holder);
       onIcon?.(id, url);
-      if (n % 3 === 2) await frame();
     }
   } finally {
     r.setRenderTarget(prevTarget);

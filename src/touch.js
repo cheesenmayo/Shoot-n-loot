@@ -203,7 +203,7 @@ export class TouchControls {
     r.classList.toggle('dead', dead);
     r.classList.toggle('bus', bus);
     r.classList.toggle('air', air);
-    r.classList.toggle('sbx', this.game.sandbox);
+    r.classList.toggle('sbxmode', this.game.sandbox);
     const target = !dead && !bus && !air ? ctrl.target : null;
     this.intEl.classList.toggle('show', !!target);
     if (target) {

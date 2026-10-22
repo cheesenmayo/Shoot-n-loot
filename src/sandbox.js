@@ -69,7 +69,7 @@ export class Sandbox {
     this.nextId = 1000;
     this.respawnT = 0;
     this.deathPos = new THREE.Vector3();
-    this.stats = { total: 0, hits: 0, log: [], last: null };
+    this.stats = { total: 0, hits: 0, log: [], last: null, target: null, targetT: 0, targetMax: 100 };
   }
 
   setCfg(key, value) {
@@ -126,12 +126,14 @@ export class Sandbox {
   }
 
   /** `quiet`: closed with Esc, which is not a user gesture, so pointer lock may be refused (a click then re-locks). */
-  closePanel(quiet = false) {
+  closePanel(quiet = false, relock = true) {
     if (!this.open) return;
+    const c = this.game.controller;
     this.open = false;
     this.panel.hide();
+    c.keys.clear();
     this.game.pauseChangedAt = performance.now();
-    this.game.controller.requestLock(quiet);
+    if (relock) c.requestLock(quiet);
   }
 
   /** Simulation time step: frozen while the panel is open, scaled by the time-scale option. */
@@ -181,6 +183,9 @@ export class Sandbox {
     s.hits++;
     s.log.push({ t: this.game.time, v: eff });
     s.last = { v: eff, head: !!info.headshot, name: victim.name, kill: victim.hp <= 0 };
+    s.target = victim;
+    s.targetT = this.game.time;
+    s.targetMax = this.enemies.find((e) => e.ch === victim)?.maxHp ?? 100;
   }
 
   dps() {
@@ -193,7 +198,7 @@ export class Sandbox {
   }
 
   resetStats() {
-    this.stats = { total: 0, hits: 0, log: [], last: null };
+    this.stats = { total: 0, hits: 0, log: [], last: null, target: null, targetT: 0, targetMax: 100 };
     this.panel.sync();
   }
 

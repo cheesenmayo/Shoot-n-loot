@@ -108,7 +108,7 @@ export class HUD {
       <div class="scope" id="scope"></div>
       <div class="feed" id="feed"></div>
       <div class="storm" id="storm"><span class="chip" id="storm-chip"><span id="storm-txt"></span></span></div>
-      <div class="sbxread hidden" id="sbx-read"><div class="chip"><span id="sbx-stats"></span></div><div class="sbxtags" id="sbx-tags"></div></div>
+      <div class="sbxread hidden" id="sbx-read"><div class="chip"><span id="sbx-stats"></span></div><div class="sbxtarget hidden" id="sbx-target"><span id="sbx-tn"></span><div class="pb"><div id="sbx-tf"></div></div><span id="sbx-tv"></span></div><div class="sbxtags" id="sbx-tags"></div></div>
       <div class="topright">
         <div class="counters">
           <div class="chip" id="chip-alive"><span><span id="alive-ic">👥</span> <span id="alive">50</span></span></div>
@@ -460,6 +460,7 @@ export class HUD {
     this.readT -= dt;
     if (this.readT > 0) return;
     this.readT = 0.2;
+    this.updateTarget(sbx);
     const n = (v) => Math.round(v).toLocaleString('en-US');
     const s = sbx.stats, last = s.last;
     const tags = [sbx.god && '🛡 GOD', sbx.infAmmo && '∞ AMMO', sbx.infItems && '∞ ITEMS', sbx.superSpeed && '⚡ SPEED', sbx.timeScale !== 1 && `⏱ ${sbx.timeScale}×`].filter(Boolean);
@@ -469,6 +470,18 @@ export class HUD {
     const [a, b] = html.split('|');
     this.$('#sbx-stats').innerHTML = a;
     this.$('#sbx-tags').innerHTML = b;
+  }
+
+  /** Health bar of the enemy that was hit last (shown for a few seconds). */
+  updateTarget(sbx) {
+    const s = sbx.stats, t = s.target, el = this.$('#sbx-target');
+    const show = !!t && this.game.time - s.targetT < 4;
+    el.classList.toggle('hidden', !show);
+    if (!show) return;
+    const hp = Math.max(0, Math.ceil(t.hp)), max = s.targetMax;
+    this.$('#sbx-tn').textContent = t.name;
+    this.$('#sbx-tf').style.width = Math.min(100, (hp / max) * 100) + '%';
+    this.$('#sbx-tv').textContent = hp > 0 ? `${hp} / ${max}` : 'KO';
   }
 
   /** Little timers above the health bar for temporary boosts (Jumpple, Runana). */
