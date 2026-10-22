@@ -510,11 +510,13 @@ export class HUD {
     for (const s of slots) sig += s ? `${s.def.id}:${s.count}:${s.rarity}:${s.mag ?? ''};` : '-;';
     if (sig !== this.lastHot) {
       this.lastHot = sig;
+      const pop = ch.inv.sel !== this.lastSel; // the newly selected slot pops (the bar is rebuilt on every ammo change, so only animate real switches)
+      this.lastSel = ch.inv.sel;
       let html = '';
       slots.forEach((s, i) => {
         if (!s) { html += `<div class="slot empty" data-i="${i}"><span class="n">${i + 1}</span></div>`; return; }
         const col = RARITIES[s.rarity].css;
-        html += `<div class="slot ${i === ch.inv.sel ? 'sel' : ''}" data-i="${i}"><span class="n">${i + 1}</span><span class="ic">${s.def.icon}</span>${s.count > 1 || s.def.kind === 'gadget' ? `<span class="cnt">${infItems && stackable(s.def) ? '∞' : s.count}</span>` : ''}<span class="nm">${s.def.id === 'pickaxe' ? '' : s.def.name}</span><span class="rar" style="background:${s.def.id === 'pickaxe' ? 'transparent' : col}"></span></div>`;
+        html += `<div class="slot ${i === ch.inv.sel ? (pop ? 'sel pop' : 'sel') : ''}" data-i="${i}"><span class="n">${i + 1}</span><span class="ic">${s.def.icon}</span>${s.count > 1 || s.def.kind === 'gadget' ? `<span class="cnt">${infItems && stackable(s.def) ? '∞' : s.count}</span>` : ''}<span class="nm">${s.def.id === 'pickaxe' ? '' : s.def.name}</span><span class="rar" style="background:${s.def.id === 'pickaxe' ? 'transparent' : col}"></span></div>`;
       });
       this.$('#hotbar').innerHTML = html;
     }

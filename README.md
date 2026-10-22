@@ -82,6 +82,32 @@ phone, or *Sandbox tools* in the pause menu) to open the tools drawer. While it 
 * If you are eliminated you respawn at the same spot after about 1.5 s with full health and your inventory (unless God mode
   is on). Your panel choices (tab, rarity, spawn options) are remembered between visits.
 
+## Look and feel
+
+Everything is procedural (no asset files), and a lot of it moves:
+
+* **Camera** – a close over-the-shoulder view (2.1 m behind, 0.6 m to the side) that eases between stances: crouching,
+  sprinting (it drifts back a little), aiming down sights and swapping shoulders glide instead of snapping. **X** swaps shoulders
+  and **V** switches to first person (hands and weapon stay in view).
+* **Characters** – each of the 50 players has a distinct outfit (nine hair styles, hats from caps to cowboy hats, faces, vests and
+  pads for the pros, goofy gear for the beginners). A model is 17 merged meshes with a proper skeleton (pelvis, spine, neck, shoulders,
+  elbows, wrists, hips, knees, ankles).
+* **Animation** – a procedural animator with two-bone IK drives everything: foot-planted walk / run / sprint / crouch / strafe /
+  backpedal cycles that follow the stick, jumps and landings that absorb the impact, weapon holds per class (the support hand is
+  placed on the weapon's own grip), per-weapon recoil, reloads per mechanism (magazines, revolver cylinders, shotgun shells, bolt,
+  lever, rocket tubes, crossbows) with the matching gun parts moving (slides, pumps, bolts, levers, hammers, a spinning
+  minigun), distinct swings for each melee weapon, throws, eating / drinking / bandaging, hit reactions and knock-backs, direction-aware
+  death falls, skydiving, gliding, swimming and dancing. Characters far from the camera switch to a cheaper pose.
+* **Items** – every weapon, consumable, ammo box and the chest is a detailed model built from merged vertex-coloured meshes (a few
+  draw calls each), with grip, magazine and ejection anchors and named moving parts the animator uses.
+* **Effects** – ejected shell casings (brass, red for shotguns), gun smoke and rocket back-blast, surface-specific impacts,
+  explosions with a flash, shock ring and debris, dust and snow puffs under running feet, landing dust rings, a cyan trail and
+  speed lines for the **Runana** boost (and for fast skydives), loot that pops in, shimmers and flies to you when picked up, and a chest
+  whose lid strains, springs open and settles.
+* **World** – trees and bushes sway in the wind, tumbleweeds roll and hop across the desert, birds circle the lake, forests and
+  peaks, chimneys and campfires smoke, snow falls around Frostpeak, pollen drifts in the green areas, dust blows in the desert,
+  Neon Heights flickers, the water has two layers of ripples, the Battle Bus has a propeller, a flag and a contrail.
+
 ## Graphics
 
 Pick **Low / Default / Ultra** on the title screen or in the pause menu. It changes live:
@@ -149,6 +175,9 @@ src/entities/              character (shared by player + bots), player controlle
 src/items.js, loot.js      item database + loot tables, ground items & chests
 src/combat.js, fx.js       hitscan/projectiles/explosions, particles & tracers
 src/hud.js, audio.js       HUD / menus / minimap, synthesised sound
+src/entities/anim/         the procedural animator: IK, locomotion, weapon holds + reloads, melee swings, death, muzzle flash
+src/charmodel.js, models.js  character models (merged parts), item / ammo / chest models
+src/world/ambient.js       tumbleweeds, birds, smoke, snow, pollen, dust, neon flicker
 src/sandbox*.js            sandbox mode: state + actions (sandbox.js), drawer UI (sandboxpanel.js), item thumbnails, data
 tools/                     build, dev server, headless tests and screenshot helpers
 dist/game.js               bundled output (committed so index.html works offline)
@@ -160,8 +189,14 @@ dist/game.js               bundled output (committed so index.html works offline
 npm run build       # production bundle -> dist/game.js
 npm run watch       # rebuild on change (unminified + sourcemap)
 npm run bundle      # also writes dist/shoot-n-loot.html (everything inlined in one file)
-npm test            # headless Chromium: mechanics, keyboard/mouse and phone touch tests (needs `playwright`)
+npm test            # headless Chromium: mechanics, input, touch, animation, models, effects, world and sandbox tests (needs `playwright`)
 ```
+
+The individual suites (`node tools/<name>.mjs`): `smoke-test` (mechanics), `input-test`, `mobile-test`, `anim-test` (rig budget, foot
+sliding, hands on grips, every state NaN-free, leaks, cost), `model-test` (every item model, draw calls, anchors, parts),
+`fx-test` (casings, impacts, pickup flight, chest lid, bus), `world-test` (layout hash, ambient layer, draw-call budgets) and
+`sandbox-test`. Preview helpers write contact sheets to `tools/shots/` (look at them with an image viewer):
+`anim-preview.mjs <sheet>`, `model-preview.mjs [guns|melee|misc|ammo]`, `world-budget.mjs`.
 
 `node tools/sandbox-test.mjs [--shots]` drives the Sandbox mode through its real UI on a desktop viewport and on an emulated
 phone (title button, B key / flask button, panel clicks, Esc handling, every item, spawn options, the 40 enemy cap, cheats,

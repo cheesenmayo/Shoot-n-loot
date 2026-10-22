@@ -78,6 +78,8 @@ kbd { background: rgba(255, 255, 255, 0.14); border: 1px solid var(--line); bord
 .slot .rar { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; }
 .slot .nm { position: absolute; left: 0; right: 0; bottom: 6px; text-align: center; font-size: 9px; opacity: 0.8; white-space: nowrap; overflow: hidden; transform: skewX(6deg); }
 .slot.empty { opacity: 0.4; }
+.slot.pop { animation: slotpop 0.22s ease-out; }
+@keyframes slotpop { 0% { transform: skewX(-6deg) scale(0.88); } 55% { transform: skewX(-6deg) scale(1.1); } 100% { transform: skewX(-6deg) scale(1); } }
 .buffs { position: absolute; left: 50%; bottom: 152px; transform: translateX(-50%); display: flex; gap: 6px; }
 .buff { background: rgba(10, 14, 26, 0.75); border: 1px solid var(--line); border-radius: 4px; padding: 3px 10px; font-size: 14px; font-weight: 800; text-shadow: 0 1px 2px #000; transform: skewX(-8deg); animation: fin 0.2s ease-out; }
 .buff b { margin-left: 8px; color: var(--accent); font-variant-numeric: tabular-nums; }

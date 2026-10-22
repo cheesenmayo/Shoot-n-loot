@@ -8,7 +8,12 @@
     "build": "node tools/build.mjs",
     "watch": "node tools/build.mjs --watch",
     "start": "node tools/build.mjs && node tools/serve.mjs",
-    "test": "node tools/smoke-test.mjs && node tools/input-test.mjs && node tools/mobile-test.mjs",
+    "test": "node tools/smoke-test.mjs && node tools/input-test.mjs && node tools/mobile-test.mjs && node tools/anim-test.mjs && node tools/model-test.mjs && node tools/fx-test.mjs && node tools/world-test.mjs && node tools/sandbox-test.mjs",
+    "test:anim": "node tools/anim-test.mjs",
+    "test:models": "node tools/model-test.mjs",
+    "test:fx": "node tools/fx-test.mjs",
+    "test:world": "node tools/world-test.mjs",
+    "test:sandbox": "node tools/sandbox-test.mjs",
     "bundle": "node tools/build.mjs && node tools/bundle-single.mjs",
     "test:input": "node tools/input-test.mjs",
     "test:mobile": "node tools/mobile-test.mjs"
