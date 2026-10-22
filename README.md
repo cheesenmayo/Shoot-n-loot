@@ -110,6 +110,9 @@ npm run bundle      # also writes dist/shoot-n-loot.html (everything inlined in 
 npm test            # headless Chromium: mechanics + input tests (needs `playwright`)
 ```
 
+`node tools/probe.mjs '<js>' [name|page:name]` runs a snippet inside the loaded game and optionally saves a screenshot
+to `tools/shots/` (handy for poking at the world without a GPU).
+
 The tests drive the real game in headless Chromium: chests, pickups, every weapon class, fall damage, Floorange, Jumpple,
 grapple, jump pads, storm damage, skydiving, bot navigation through multi‑storey buildings, keyboard/mouse input, pause menu
 and graphics presets.

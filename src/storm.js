@@ -132,7 +132,10 @@ export class Storm {
       } else c.inStorm = false;
     }
 
-    // visuals
+    // visuals (the wall only shows up once you are reasonably close to it)
+    const cam = this.game.camera.position;
+    const camToEdge = Math.abs(this.r - Math.hypot(cam.x - this.cx, cam.z - this.cz));
+    this.wall.visible = camToEdge < 850;
     const r = Math.max(this.r, 0.5);
     this.wall.scale.set(r, 1, r);
     this.wall.position.x = this.cx; this.wall.position.z = this.cz;
