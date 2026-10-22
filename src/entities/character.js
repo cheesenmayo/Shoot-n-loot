@@ -14,6 +14,10 @@ export const PHYS = {
 
 const _v = new THREE.Vector3();
 const _hit = {};
+const FLASH = {
+  geo: new THREE.PlaneGeometry(0.34, 0.34),
+  mat: new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }),
+};
 const _env = { desert: 0, snow: 0, rock: 0, forest: 0, sand: 0 };
 
 export class Character {
@@ -91,11 +95,11 @@ export class Character {
 
   _makeFlash() {
     const g = new THREE.Group();
-    const mat = new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
-    const a = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.34), mat);
+    const mat = FLASH.mat, geo = FLASH.geo;
+    const a = new THREE.Mesh(geo, mat);
     const b = a.clone();
     b.rotation.z = Math.PI / 2;
-    const c = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.34), mat);
+    const c = new THREE.Mesh(geo, mat);
     c.rotation.y = Math.PI / 2;
     g.add(a, b, c);
     g.visible = false;
@@ -912,7 +916,13 @@ export class Character {
 
   dispose() {
     this.game.scene.remove(this.root);
-    if (this.ropeLine) this.game.scene.remove(this.ropeLine);
+    // the glider is the only per-character geometry/material (everything else is shared)
+    this.glider.traverse((o) => { o.geometry?.dispose(); o.material?.dispose?.(); });
+    if (this.ropeLine) {
+      this.game.scene.remove(this.ropeLine);
+      this.ropeLine.geometry.dispose();
+      this.ropeLine.material.dispose();
+    }
   }
 }
 

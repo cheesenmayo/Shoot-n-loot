@@ -398,7 +398,9 @@ export class Game {
     // bus
     b.update(dt);
     for (const c of this.chars) if (c.alive && c.mode === 'bus') { c.pos.copy(b.pos); c.pos.y -= 3; }
-    if (!b.active && !this.forcedJump && (this.state === 'bus' || this.chars.some((c) => c.mode === 'bus'))) {
+    // everyone still aboard is ejected once the bus is leaving the island
+    const leaving = b.active && b.progress > 0.5 && Math.hypot(b.pos.x, b.pos.z) > WORLD.islandR - 90;
+    if ((!b.active || leaving) && !this.forcedJump && this.chars.some((c) => c.mode === 'bus' && c.alive)) {
       this.forcedJump = true;
       for (const c of this.chars) if (c.mode === 'bus' && c.alive) this.jumpFromBus(c);
     }

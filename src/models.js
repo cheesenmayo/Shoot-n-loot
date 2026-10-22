@@ -406,6 +406,9 @@ export function ammoModel(type) {
 // ---------------------------------------------------------------------------
 // Chest
 // ---------------------------------------------------------------------------
+const CHEST_GLOW_GEO = new THREE.CylinderGeometry(0.9, 0.9, 0.02, 20);
+const CHEST_GLOW_MAT = new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+
 export function chestModel() {
   const g = new THREE.Group();
   const base = new THREE.Group();
@@ -424,10 +427,7 @@ export function chestModel() {
   B(lid, 0.08, 0.3, 0.64, 0xf2b62a, 0.4, 0.15, 0.3, { metal: 0.8, rough: 0.3 });
   B(lid, 0.14, 0.14, 0.05, 0xffe08a, 0, 0.05, 0.62, { metal: 0.9, rough: 0.2, emissive: 0xffc02a, emissiveIntensity: 0.5 });
   g.add(base, lid);
-  const glow = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.9, 0.9, 0.02, 20),
-    new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }),
-  );
+  const glow = new THREE.Mesh(CHEST_GLOW_GEO, CHEST_GLOW_MAT);
   glow.position.y = 0.02;
   g.add(glow);
   g.userData = { lid, glow };

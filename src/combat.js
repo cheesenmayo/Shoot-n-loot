@@ -6,6 +6,15 @@ import { clamp } from './util.js';
 const R_BODY = 0.4;
 const _o = new THREE.Vector3(), _d = new THREE.Vector3(), _m = new THREE.Vector3(), _n = new THREE.Vector3(), _p = new THREE.Vector3();
 const hitInfo = {};
+// shared projectile geometry (created once, reused for every shot)
+const ROCKET = {
+  bodyGeo: new THREE.CylinderGeometry(0.06, 0.06, 0.5, 8).rotateX(Math.PI / 2),
+  bodyMat: new THREE.MeshStandardMaterial({ color: 0x8a8f96, metalness: 0.5 }),
+  noseGeo: new THREE.ConeGeometry(0.06, 0.18, 8).rotateX(-Math.PI / 2),
+  noseMat: new THREE.MeshStandardMaterial({ color: 0xc0392b }),
+  boltGeo: new THREE.CylinderGeometry(0.012, 0.012, 0.6, 4).rotateX(Math.PI / 2),
+  boltMat: new THREE.MeshBasicMaterial({ color: 0xdddddd }),
+};
 
 /** Ray vs a standing character (cylinder with a narrower head). Returns {t, head} or null. */
 export function rayChar(ox, oy, oz, dx, dy, dz, maxT, c) {
@@ -226,14 +235,13 @@ export class Combat {
     p.spin = new THREE.Vector3(Math.random() * 8, Math.random() * 8, Math.random() * 8);
     if (p.kind === 'rocket') {
       const m = new THREE.Group();
-      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.5, 8).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x8a8f96, metalness: 0.5 }));
-      const nose = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.18, 8).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xc0392b }));
+      const body = new THREE.Mesh(ROCKET.bodyGeo, ROCKET.bodyMat);
+      const nose = new THREE.Mesh(ROCKET.noseGeo, ROCKET.noseMat);
       nose.position.z = -0.33;
       m.add(body, nose);
       p.mesh = m;
     } else if (p.kind === 'bolt') {
-      const m = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.6, 4).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xdddddd }));
-      p.mesh = m;
+      p.mesh = new THREE.Mesh(ROCKET.boltGeo, ROCKET.boltMat);
     } else {
       const m = itemModel(p.def.model ? p.def.id : 'frag');
       m.scale.setScalar(p.kind === 'grenade' ? 1.4 : 1.6);
