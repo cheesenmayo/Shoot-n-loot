@@ -41,8 +41,8 @@ function glowTexture() {
   c.width = c.height = 64;
   const x = c.getContext('2d');
   const g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
-  g.addColorStop(0, 'rgba(255,240,200,1)');
-  g.addColorStop(0.25, 'rgba(255,190,90,0.7)');
+  g.addColorStop(0, 'rgba(255,226,150,0.95)');
+  g.addColorStop(0.3, 'rgba(255,170,70,0.55)');
   g.addColorStop(1, 'rgba(255,120,30,0)');
   x.fillStyle = g;
   x.fillRect(0, 0, 64, 64);
@@ -61,7 +61,7 @@ function getShared() {
   const blastB = blastShape().rotateZ(Math.PI / 2);
   shared = {
     cone, star: starShape(8, 0.17, 0.045, 1), star2: starShape(5, 0.1, 0.03), blastA, blastB,
-    matHot: add(0xffe9a0, 0.95), matOrange: add(0xff9a2a, 0.75), matCone: add(0xffc050, 0.7),
+    matHot: add(0xffd878, 0.9), matOrange: add(0xff8a22, 0.7), matCone: add(0xffb040, 0.55),
     glow: new THREE.SpriteMaterial({ map: glowTexture(), color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, toneMapped: false }),
   };
   return shared;
@@ -79,9 +79,13 @@ export function makeFlash() {
   const a = new THREE.Mesh(s.blastA, s.matOrange);
   const b = new THREE.Mesh(s.blastB, s.matOrange);
   const glow = new THREE.Sprite(s.glow);
-  glow.scale.set(0.42, 0.42, 1);
+  glow.scale.set(0.3, 0.3, 1);
   glow.position.z = -0.05;
-  for (const o of [cone, star, star2, a, b, glow]) { o.matrixAutoUpdate = true; o.frustumCulled = false; }
+  for (const o of [cone, star, star2, a, b, glow]) {
+    o.frustumCulled = false;
+    // game.js toggles castShadow on every mesh of a character by distance; glowing flame must never cast shadows
+    Object.defineProperty(o, 'castShadow', { get: () => false, set: () => {} });
+  }
   g.add(cone, star, star2, a, b, glow);
   g.userData = { star, star2, cone, glow };
   g.visible = false;

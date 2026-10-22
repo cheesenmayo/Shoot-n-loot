@@ -10,7 +10,7 @@ import { ease, ramp } from './ik.js';
 // ---------------------------------------------------------------------------
 
 const STAND_Y = 0.897;
-const CROUCH_Y = 0.56;
+const CROUCH_Y = 0.54;
 const ANKLE = RIG.ankle;
 const LMAX = (RIG.thigh + RIG.shin) * 0.995;
 
@@ -38,7 +38,7 @@ export function gaitLegs(A, dt, sv, move, crouch, dirX, dirZ, stride, air, lod) 
   const runT = smoothstep(2.4, 5.8, sv), sprT = smoothstep(7.4, 9.4, sv);
   let duty = lerp(lerp(0.62, 0.47, runT), 0.4, sprT) + 0.08 * crouch;
   duty = Math.min(0.7, duty);
-  const lift = lerp(lerp(0.06, 0.14, runT), 0.22, sprT) * (1 - 0.45 * crouch);
+  const lift = Math.max(0.075, lerp(lerp(0.06, 0.14, runT), 0.22, sprT) * (1 - 0.3 * crouch));
   const D = duty * stride * move;
   const aim = A.sAim * (1 - move);
   const widen = 0.02 + 0.03 * aim + 0.02 * crouch - 0.025 * runT;
@@ -88,13 +88,12 @@ export function gaitLegs(A, dt, sv, move, crouch, dirX, dirZ, stride, air, lod) 
     if (i === 0) { stanceW0 = stance; sNorm0 = L.s[0]; } else { stanceW1 = stance; sNorm1 = L.s[1]; }
   }
   // pelvis height
-  const flight = (() => {
-    const ph = A.phase % 0.5;
-    const span = 0.5 - duty;
-    if (span <= 0.02) return 0;
-    const u = (ph - duty) / span;
-    return u > 0 && u < 1 ? Math.sin(u * Math.PI) : 0;
-  })();
+  let flight = 0;
+  {
+    const ph = A.phase % 0.5, span = 0.5 - duty;
+    const u = span > 0.02 ? (ph - duty) / span : -1;
+    if (u > 0 && u < 1) flight = Math.sin(u * Math.PI);
+  }
   const bend = 0.015 * ramp(0.3, 2, sv) + 0.045 * runT + 0.02 * sprT;
   let yBase = lerp(STAND_Y, CROUCH_Y, crouch) - bend * (1 - crouch);
   yBase += (0.04 * runT + 0.035 * sprT) * flight * move * (1 - crouch);

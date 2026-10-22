@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { RIG } from '../charmodel.js';
 import { clamp, lerp, wrapAngle } from '../util.js';
 import { solveTwoBone, IK, endLocal, spring, springZ, ease, ramp } from './anim/ik.js';
-import { Hold, computeHold, applyEquip, makeItemInfo, PALM, KICK } from './anim/holds.js';
+import { Hold, computeHold, applyEquip, makeItemInfo, PALM, KICK, Q_GUN } from './anim/holds.js';
 import { gaitLegs, fkLegsAir, GAIT } from './anim/locomotion.js';
 import { poseSwim, poseSkydive, poseGlide, poseDance, poseTumble } from './anim/poses.js';
 import { DeathSim } from './anim/death.js';
@@ -45,6 +45,8 @@ const _eul = new THREE.Euler();
 
 const SHOULDER_X = RIG.shoulderX, SHOULDER_Y = RIG.shoulderY;
 const UA = RIG.upperArm, FA = RIG.foreArm;
+const REACH = (UA + FA) * 0.97;
+const SR = new THREE.Vector3(SHOULDER_X, SHOULDER_Y, 0), SL = new THREE.Vector3(-SHOULDER_X, SHOULDER_Y, 0);
 
 /** Quaternion from pitch (x), yaw (y), roll (z) applied in YXZ order. */
 export function qeul(out, x, y, z) {
@@ -73,7 +75,10 @@ export class Animator {
     // smoothed hand targets
     this.cwp = new THREE.Vector3(0.2, 0.2, -0.2); this.cwq = new THREE.Quaternion();
     this.clp = new THREE.Vector3(); this.clq = new THREE.Quaternion();
+    this.overL = 0; this.overR = 0; // how far the last hand targets were beyond the arm's reach
+    this.lAbsPrev = false; this.wpLast = new THREE.Vector3(); this.wqLast = new THREE.Quaternion();
     this.qAim = new THREE.Quaternion(); this.qAimEff = new THREE.Quaternion();
+    this.coq = new THREE.Quaternion().copy(Q_GUN); // item rotation in the hand (smoothed)
     // action timers
     this.swingK = -1; this.swingCount = 0; this.prevSwingT = 0;
     this.throwK = -1; this.throwRel = -99; this.prevThrowT = 0;
@@ -85,7 +90,7 @@ export class Animator {
     // motion history
     this.pvx = 0; this.pvz = 0; this.pvy = 0; this.pYaw = 0;
     this.fwdAcc = 0; this.sideAcc = 0;
-    this.justJumped = false; this.jumpSide = 1;
+    this.justJumped = false; this.jumpSide = 1; this.padT = -9;
     // face / look
     this.blinkT = 1 + (ch.seed % 5); this.lidT = 0;
     this.lookT = 2 + (ch.seed % 3); this.lookY = 0; this.lookP = 0;
@@ -116,8 +121,7 @@ export class Animator {
       model.scale.setScalar(1);
     }
     this.kickCat = def && def.kind === 'gun' ? (def.cat in KICK ? def.cat : 'rifle') : def && def.kind === 'gadget' ? 'gadget' : 'rifle';
-    this.cwp.set(0.2, 0.2, -0.2);
-    this.cwq.identity();
+    this.actionId = -1; this.actionSince = 0; // start blending slowly into the new item's pose
   }
 
   /** Events from the Character (see character.js): shoot, hit, headshot, land, jump, pad, gadget, reload, equip, tumble, die. */
@@ -161,6 +165,7 @@ export class Animator {
         break;
       case 'pad':
         this.justJumped = true;
+        this.padT = this.t;
         this.jumpSide = this.phase % 1 < 0.5 ? 1 : -1;
         break;
       case 'gadget': this.gadgetT0 = this.t; break;
@@ -274,8 +279,8 @@ export class Animator {
     const vx = ch.vel.x, vz = ch.vel.z, vy = ch.vel.y;
     // a sudden velocity change that was not a jump or a landing is a knock (explosion, impulse, melee)
     const ax = vx - this.pvx, az = vz - this.pvz, ay = vy - this.pvy;
-    const dv = Math.hypot(ax, az, ay);
-    if (dt > 0 && dv > 5 && dv / dt > 200 && ch.mode === 'normal' && ch.alive && !this.justJumped && !(ch.grounded && ay > 4 && Math.hypot(ax, az) < 4)) {
+    const dv = Math.sqrt(ax * ax + az * az + ay * ay);
+    if (dt > 0 && dv > 5 && dv / dt > 200 && ch.mode === 'normal' && ch.alive && !this.justJumped && !(ch.grounded && ay > 4 && ax * ax + az * az < 16)) {
       const cy = Math.cos(ch.bodyYaw), sy = Math.sin(ch.bodyYaw);
       const lx = ax * cy - az * sy, lb = ax * sy + az * cy; // right, back
       if (!ch.grounded && dv > 10) this.event('tumble', lx, lb);
@@ -323,7 +328,7 @@ export class Animator {
     const inp = ch.input;
     const t = this.t;
     const grounded = ch.grounded && !ch.swimming;
-    const hspeed = Math.hypot(ch.vel.x, ch.vel.z);
+    const hspeed = Math.sqrt(ch.vel.x * ch.vel.x + ch.vel.z * ch.vel.z);
     const def = this.heldDef;
     const kind = def ? def.kind : null;
     const gun = kind === 'gun';
@@ -352,13 +357,14 @@ export class Animator {
       spring(X, V, S_DIRX, vr / hspeed, 14, dt);
       spring(X, V, S_DIRZ, -vf / hspeed, 14, dt);
     }
-    let dl = Math.hypot(X[S_DIRX], X[S_DIRZ]);
+    let dl = Math.sqrt(X[S_DIRX] * X[S_DIRX] + X[S_DIRZ] * X[S_DIRZ]);
     if (dl < 1e-4) { X[S_DIRX] = 0; X[S_DIRZ] = -1; dl = 1; }
     const dirX = X[S_DIRX] / dl, dirZ = X[S_DIRZ] / dl;
     const fwdness = Math.max(0, -dirZ);
 
     // ---- gait (distance driven)
-    const stride = GAIT.strideLen(sv, crouch);
+    // sideways / backward steps are shorter (the cadence rises instead)
+    const stride = GAIT.strideLen(sv, crouch) * (1 - 0.42 * Math.abs(dirX) - 0.22 * Math.max(0, dirZ));
     if (grounded && hspeed > 0.25) this.phase += hspeed * dt / stride;
     this.phase %= 1;
     const turn = X[S_TURN];
@@ -375,7 +381,7 @@ export class Animator {
     const bank = clamp(turn * Math.min(sv, 9) * 0.012, -0.22, 0.22);
     const aim = this.sAim, ads = this.sAds, sp = this.sSprint;
 
-    const pelvisPitch = (leanSpeed * 0.45 + X[S_LEANF] * 0.5 - crouch * 0.25) * (1 - air * 0.3);
+    const pelvisPitch = (leanSpeed * 0.45 + X[S_LEANF] * 0.5 - crouch * 0.12) * (1 - air * 0.3);
     const pelvisYaw = bob.yaw - 0.1 * aim - 0.1 * ads + H.pelvisY;
     const pelvisRoll = bob.roll + bank * 0.6 + X[S_LEANS] * 0.4 + shift * 0.02;
     const px = bob.x + shift * 0.012 + H.stepX, pz = bob.z + H.stepZ * 0.5 - 0.02 * crouch;
@@ -391,7 +397,7 @@ export class Animator {
     const aimPitch = clamp(ch.pitch, -1.3, 1.3);
     const gunAim = holding && (gun || kind === 'gadget');
     const aimY = gunAim ? aim : 0;
-    let spinePitch = leanSpeed * 0.55 + X[S_LEANF] * 0.5 - crouch * 0.42 + aimPitch * 0.3 * (gunAim ? 0.3 + aimY * 0.7 : 0.4) + H.spineX;
+    let spinePitch = leanSpeed * 0.55 + X[S_LEANF] * 0.5 - crouch * 0.24 + aimPitch * 0.3 * (gunAim ? 0.3 + aimY * 0.7 : 0.4) + H.spineX;
     spinePitch += breath * 0.012 - 0.006;
     let spineYaw = -bob.yaw * 1.5 + 0.3 * aimY * (1 - sp) + 0.08 * ads + H.spineY + turn * 0.012;
     let spineRoll = -bob.roll * 0.6 + bank * 0.4 + X[S_LEANS] * 0.3 + H.spineZ;
@@ -486,12 +492,19 @@ export class Animator {
     applyEquip(H, this, this.equipK);
     // after an action change the smoothing is slow for a moment, so poses glide into each other
     const act = this.using ? 1 : ch.reload ? 2 : this.swingK >= 0 ? 3 : this.throwK >= 0 ? 4 : this.gadgetK >= 0 ? 5 : 0;
-    if (act !== this.actionId) { this.actionId = act; this.actionSince = 0; }
+    if (act !== this.actionId) { this.actionId = act; this.actionSince = act === 3 ? 0.45 : act === 4 ? 0.3 : 0; }
     this.actionSince += dt;
     const rate = Math.min(H.rate, 9 + 80 * this.actionSince);
     const kr = 1 - Math.exp(-rate * dt);
     this.cwp.lerp(H.wp, kr);
     this.cwq.slerp(H.wq, kr);
+    this.coq.slerp(H.offQ, kr);
+    if (H.lAbs !== this.lAbsPrev) {
+      // the support-hand target switches between weapon space and torso space: carry the smoothed value over
+      if (H.lAbs) { this.clp.applyQuaternion(this.wqLast).add(this.wpLast); this.clq.premultiply(this.wqLast); }
+      else { this.clp.sub(this.wpLast).applyQuaternion(_q.copy(this.wqLast).invert()); this.clq.premultiply(_q); }
+      this.lAbsPrev = H.lAbs;
+    }
     this.clp.lerp(H.lp, kr);
     this.clq.slerp(H.lq, kr);
     spring(X, V, S_RW, H.rw, 12, dt);
@@ -522,27 +535,34 @@ export class Animator {
     }
     _wp.y += X[Z_HX] * 0.012; _wp.x += -X[Z_HZ] * 0.01;
 
-    // ---- right arm: the grip. desired hand orientation = weapon * offQ^-1
-    _S.set(SHOULDER_X, SHOULDER_Y, 0);
-    _qOffInv.copy(H.offQ).invert();
-    _hq.copy(_wq).multiply(_qOffInv);
-    _T.copy(PALM).applyQuaternion(_hq);
-    _T.subVectors(_wp, _T);
-    _pole.copy(H.rPole);
-    this.arm(m.armR, 1, _S, _T, _hq, _pole, rw);
-    // actual weapon pose after the solve
-    this.handFK(m.armR, _S, _hp, _hq);
-    _hp.add(_v.copy(PALM).applyQuaternion(_hq));
-    _hq.multiply(H.offQ);
-    // ---- left arm
-    _S.set(-SHOULDER_X, SHOULDER_Y, 0);
-    if (lw > 0.001) {
+    // ---- arms. Right hand = the grip (hand orientation = weapon * offQ^-1), left hand = support target derived
+    // from the weapon pose the right arm actually reached. If the support hand is out of reach the weapon is
+    // pulled back toward the body along its own axis.
+    _qOffInv.copy(this.coq).invert();
+    for (let it = 0; ; it++) {
+      _hq.copy(_wq).multiply(_qOffInv);
+      _T.copy(PALM).applyQuaternion(_hq);
+      _T.subVectors(_wp, _T);
+      _pole.copy(H.rPole);
+      this.overR = _T.distanceTo(SR) - REACH;
+      this.arm(m.armR, 1, SR, _T, _hq, _pole, rw);
+      this.handFK(m.armR, SR, _hp, _hq);
+      _hp.add(_v.copy(PALM).applyQuaternion(_hq));
+      _hq.multiply(this.coq);
+      if (lw <= 0.001) { this.overL = 0; break; }
       if (H.lAbs) { _tp.copy(this.clp); _tq.copy(this.clq); }
       else { _tp.copy(this.clp).applyQuaternion(_hq).add(_hp); _tq.copy(_hq).multiply(this.clq); }
       _tp.sub(_v.copy(PALM).applyQuaternion(_tq));
+      const over = this.overL = _tp.distanceTo(SL) - REACH;
+      if (over <= 0 || H.lAbs || it >= 2) break;
+      _v.set(0, 0, 1).applyQuaternion(_wq).multiplyScalar(Math.min(0.3, over * 1.2));
+      _wp.add(_v);
+    }
+    this.wpLast.copy(_hp); this.wqLast.copy(_hq);
+    if (lw > 0.001) {
       _pole.copy(H.lPole);
-      this.arm(m.armL, -1, _S, _tp, _tq, _pole, lw);
-    } else this.arm(m.armL, -1, _S, _tp, null, _pole, 0);
+      this.arm(m.armL, -1, SL, _tp, _tq, _pole, lw);
+    } else this.arm(m.armL, -1, SL, _tp, null, _pole, 0);
     this.applyItem(dt);
   }
 
@@ -558,9 +578,11 @@ export class Animator {
     const swing = sw * (0.28 + 0.55 * run + 0.15 * spr) * move * (0.4 + 0.6 * fwdness);
     const crouch = X[S_CROUCH], air = X[S_AIR];
     const breath = Math.sin(this.t * 1.9 + side) * 0.02;
-    const fkx = swing * (1 - 0.5 * crouch) + 0.04 + 0.1 * air + breath;
-    const fkz = side * (0.09 + 0.08 * (1 - move) + 0.45 * air) + breath * 0.5;
-    const flex = 0.18 + 0.25 * crouch + (0.55 + 0.6 * spr) * run * move + Math.max(0, swing) * 0.5 * move + 0.4 * air;
+    // jump pad launch: arms thrown up
+    const pad = clamp(1 - (this.t - this.padT) / 1.1, 0, 1) * air;
+    const fkx = swing * (1 - 0.5 * crouch) + 0.04 + 0.1 * air + breath + 2.3 * pad;
+    const fkz = side * (0.09 + 0.08 * (1 - move) + 0.45 * air + 0.3 * pad) + breath * 0.5;
+    const flex = 0.18 + 0.25 * crouch + (0.55 + 0.6 * spr) * run * move + Math.max(0, swing) * 0.5 * move + 0.4 * air - 0.3 * pad;
     qeul(_Q1, fkx, 0, fkz);
     if (w <= 0.0005) {
       arm.a.quaternion.copy(_Q1);
@@ -608,7 +630,7 @@ export class Animator {
   applyItem(dt) {
     const H = this.hold, o = this.itemObj;
     if (!o) return;
-    o.quaternion.copy(H.offQ);
+    o.quaternion.copy(this.coq);
     o.position.copy(PALM);
     o.visible = H.itemVisible;
     const s = H.itemScale;
@@ -652,7 +674,7 @@ export class Animator {
   poseGroundSimple(dt) {
     const ch = this.ch, m = this.m, X = this.X, V = this.V;
     const grounded = ch.grounded && !ch.swimming;
-    const hspeed = Math.hypot(ch.vel.x, ch.vel.z);
+    const hspeed = Math.sqrt(ch.vel.x * ch.vel.x + ch.vel.z * ch.vel.z);
     const def = this.heldDef;
     const crouch = ch.crouching ? 1 : 0;
     spring(X, V, S_SPEED, grounded ? hspeed : 0, 10, dt);
@@ -711,7 +733,7 @@ export class Animator {
     }
     if (this.itemObj) {
       const o = this.itemObj;
-      o.quaternion.copy(this.hold.offQ);
+      o.quaternion.copy(this.coq);
       o.position.copy(PALM);
       o.visible = true;
       if (o.scale.x !== 1) o.scale.setScalar(1);

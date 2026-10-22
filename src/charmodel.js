@@ -14,7 +14,7 @@ export const RIG = {
   waist: 0.07, // torso origin above the pelvis origin
   neckY: 0.5, headY: 0.03, // neck above torso, head above neck
   shoulderX: 0.31, shoulderY: 0.43,
-  upperArm: 0.32, foreArm: 0.3, palm: 0.055,
+  upperArm: 0.34, foreArm: 0.32, palm: 0.055,
 };
 
 const SKINS = [0xf1c8a0, 0xe0ac7c, 0xc68a5c, 0x9a6540, 0x6e4529, 0xf7d9bd];
@@ -362,12 +362,13 @@ export function characterModel(seed = 1, opts = {}) {
       const b = new PartBuilder();
       b.sx = side;
       const sl = sleeveLen; // how far down the sleeve reaches (m from the shoulder, capped to the upper arm)
-      const upTo = Math.min(sl, 0.32);
+      const UA = RIG.upperArm;
+      const upTo = Math.min(sl, UA);
       b.box(0.012, 0.03, 0, 0.17, 0.09, 0.17, sleeveC, { ao: 0.9 }); // shoulder cap
       b.box(0, 0.03 - (upTo + 0.04) / 2 + 0.0, 0, 0.158, upTo + 0.04, 0.16, sleeveC, { taper: [1.04, 1.0], ao: 0.75 });
-      if (upTo < 0.3) {
+      if (upTo < UA - 0.02) {
         b.box(0, -upTo - 0.012, 0, 0.162, 0.024, 0.164, hemC, { ao: 0.85 });
-        b.box(0, -(upTo + 0.3) / 2 - 0.005, 0, 0.122, 0.32 - upTo, 0.122, skin, { taper: [1.06, 1.06], ao: 0.8 });
+        b.box(0, -(upTo + UA - 0.02) / 2 - 0.005, 0, 0.122, UA - upTo, 0.122, skin, { taper: [1.06, 1.06], ao: 0.8 });
       }
       if (o.sleeve === 'rolled') b.box(0, -upTo + 0.035, 0, 0.176, 0.07, 0.178, shade(sleeveC, 0.88), { ao: 0.9 });
       if (o.sleeveStripe && detail > 0) b.box(0.081, -0.04, 0, 0.012, 0.05, 0.168, 0xffffff, { ao: 1 });
@@ -380,8 +381,8 @@ export function characterModel(seed = 1, opts = {}) {
     {
       const b = new PartBuilder();
       b.sx = side;
-      const covered = Math.max(0, sleeveLen - 0.32); // sleeve continues over the forearm
-      const fl = RIG.foreArm;
+      const covered = Math.max(0, sleeveLen - RIG.upperArm); // sleeve continues over the forearm
+      const fl = RIG.foreArm, wy = fl - 0.3; // wrist details sit near the hand end
       b.box(0, -fl / 2 + 0.01, 0, 0.108, fl + 0.02, 0.108, skin, { taper: [1.12, 1.12], ao: 0.8 });
       if (covered > 0.01) {
         const cl = Math.min(covered, fl);
@@ -390,12 +391,12 @@ export function characterModel(seed = 1, opts = {}) {
       } else if (o.sleeve === 'rolled') b.box(0, -0.0, 0, 0.134, 0.05, 0.134, shade(sleeveC, 0.88), { ao: 0.9 });
       if (o.kneePads && o.skill === 'pro' && detail > 0) b.box(0, 0.0, -0.065, 0.1, 0.07, 0.03, 0x23262b, {}); // elbow pad
       if (o.wrist === 'watch' && !left) {
-        b.box(0, -0.235, 0, 0.12, 0.04, 0.122, 0x23262b, { ao: 1 });
-        b.box(0.0, -0.235, -0.066, 0.05, 0.04, 0.012, 0x7ad8ff, { ao: 1 });
-      } else if (o.wrist === 'band') b.box(0, -0.245, 0, 0.122, 0.04, 0.124, o.wristColor, { ao: 0.95 });
+        b.box(0, -0.235 - wy, 0, 0.12, 0.04, 0.122, 0x23262b, { ao: 1 });
+        b.box(0.0, -0.235 - wy, -0.066, 0.05, 0.04, 0.012, 0x7ad8ff, { ao: 1 });
+      } else if (o.wrist === 'band') b.box(0, -0.245 - wy, 0, 0.122, 0.04, 0.124, o.wristColor, { ao: 0.95 });
       else if (o.wrist === 'bracer' || o.skill === 'pro') {
-        b.box(0, -0.18, 0, 0.126, 0.13, 0.126, 0x23262b, { taper: [1.04, 1.04], ao: 0.85 });
-        if (detail > 0) b.box(0, -0.18, -0.066, 0.07, 0.06, 0.012, 0x4a5058, {});
+        b.box(0, -0.18 - wy, 0, 0.126, 0.13, 0.126, 0x23262b, { taper: [1.04, 1.04], ao: 0.85 });
+        if (detail > 0) b.box(0, -0.18 - wy, -0.066, 0.07, 0.06, 0.012, 0x4a5058, {});
       }
       addMesh(fore, b, left ? 'foreL' : 'foreR');
     }

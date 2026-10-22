@@ -197,14 +197,15 @@ function danceMove(m, t, c, o) {
       legR(0.15, 0.12, 0.45 + 0.15 * sw); legL(0.15, -0.12, 0.45 - 0.15 * sw);
       break;
     }
-    case 1: { // disco point: one arm up, the other on the hip
-      const up = s > 0 ? 1 : -1;
-      const ah = 0.5 + 0.5 * Math.abs(s);
-      if (up > 0) { armR(2.7, 0, 0.5, 0.1); armL(0.5, 0, -0.55, 1.75); } else { armL(2.7, 0, -0.5, 0.1); armR(0.5, 0, 0.55, 1.75); }
+    case 1: { // disco point: one arm up, the other on the hip, swapping on the beat
+      const u = 0.5 + 0.5 * Math.tanh(s * 1.7); // 1 = right arm up
+      const L = (a, b) => a + (b - a) * u;
+      armR(L(0.5, 2.7), 0, L(0.55, 0.5), L(1.75, 0.1));
+      armL(L(2.7, 0.5), 0, L(-0.5, -0.55), L(0.1, 1.75));
+      const up = u * 2 - 1;
       o[1] = -up * 0.12; o[4] = up * 0.18; o[5] = up * 0.05; o[7] = up * 0.25; o[10] = -up * 0.25; o[9] = -0.1;
       o[0] = -0.08 + 0.03 * Math.abs(cc);
-      legR(0.1 + (up > 0 ? 0.2 : 0), 0.2, 0.5, 0); legL(0.1 + (up < 0 ? 0.2 : 0), -0.2, 0.5, 0);
-      void ah;
+      legR(0.1 + 0.2 * u, 0.2, 0.5, 0); legL(0.1 + 0.2 * (1 - u), -0.2, 0.5, 0);
       break;
     }
     case 2: { // the shuffle: legs run in place, arms pump
@@ -217,7 +218,7 @@ function danceMove(m, t, c, o) {
     }
     case 3: { // spin with both hands up
       const k = t / MOVE_LEN;
-      o[2] = ease.smooth(k) * Math.PI * 2;
+      o[2] = ease.smooth(k) * Math.PI * 2 - (k > 0.5 ? Math.PI * 2 : 0); // continuous, ends at 0
       armR(2.9, 0, 0.35 + 0.15 * s, 0.15); armL(2.9, 0, -0.35 + 0.15 * s, 0.15);
       o[0] = -0.1 + 0.05 * Math.sin(k * Math.PI); o[6] = 0.05; o[9] = 0.2; o[11] = 0.15 * s;
       legR(0.1, 0.12, 0.7, 0); legL(0.2, -0.12, 0.5, 0);

@@ -19,7 +19,7 @@ const _qx = new THREE.Quaternion();
 const _ax = new THREE.Vector3(1, 0, 0);
 
 /** Result of the last solveTwoBone() call (reused, never allocated). */
-export const IK = { flex: 0, reach: 0, ex: 0, ey: 0, ez: 0, tx: 0, ty: 0, tz: 0 };
+export const IK = { flex: 0 };
 
 /** Quaternion from the columns of an orthonormal basis. */
 export function quatFromBasis(out, x, y, z) {
@@ -72,14 +72,17 @@ export function solveTwoBone(outQ, S, T, pole, l1, l2, zSign) {
   _v.copy(_d).multiplyScalar(Lc).sub(_e).multiplyScalar(1 / l2);
   const cosF = Math.max(-1, Math.min(1, _u.dot(_v)));
   IK.flex = Math.acos(cosF);
-  IK.reach = Lc;
-  IK.ex = S.x + _e.x; IK.ey = S.y + _e.y; IK.ez = S.z + _e.z;
-  IK.tx = S.x + _d.x * Lc; IK.ty = S.y + _d.y * Lc; IK.tz = S.z + _d.z * Lc;
-  // bend direction: the part of the lower bone that is perpendicular to the upper bone
+  // bend direction: the part of the lower bone that is perpendicular to the upper bone. For a (nearly) straight
+  // limb that direction is numerical noise, so it fades to the pole-based direction (no roll flips)
+  _bx.copy(_n).multiplyScalar(-1).addScaledVector(_u, _n.dot(_u));
+  let pl = _bx.length();
+  if (pl < 1e-6) { _bx.set(0, 0, 1).addScaledVector(_u, -_u.z); pl = _bx.length() || 1; }
+  _bx.multiplyScalar(1 / pl);
   _b.copy(_v).addScaledVector(_u, -_v.dot(_u));
   const bl = _b.length();
-  if (bl < 1e-4) _b.copy(_n).multiplyScalar(-1).addScaledVector(_u, _n.dot(_u)).normalize();
-  else _b.multiplyScalar(1 / bl);
+  const wg = bl < 1e-6 ? 0 : Math.min(1, Math.max(0, (IK.flex - 0.03) / 0.22));
+  if (wg > 0) _b.multiplyScalar(wg / bl).addScaledVector(_bx, 1 - wg); else _b.copy(_bx);
+  _b.normalize();
   _by.copy(_u).multiplyScalar(-1);
   _bz.copy(_b).multiplyScalar(zSign);
   _bx.crossVectors(_by, _bz);
@@ -129,7 +132,6 @@ export function spring(X, V, i, target, omega, dt) {
   const t1 = (V[i] + omega * n) * dt;
   X[i] = target + (n + t1) * e;
   V[i] = (V[i] - omega * t1) * e;
-  return X[i];
 }
 
 /** Under-damped spring step (zeta < 1) used for secondary motion and hit reactions. */
@@ -143,7 +145,6 @@ export function springZ(X, V, i, target, omega, zeta, dt) {
     x += v * h;
   }
   X[i] = x; V[i] = v;
-  return x;
 }
 
 export const ease = {

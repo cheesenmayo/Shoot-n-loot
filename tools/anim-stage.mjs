@@ -21,9 +21,62 @@ export function stageInit() {
     g.bus.update = () => {};
     for (const b of g.bots) b.update = () => {};
     g.controller.update = () => {};
-    const plaza = g.world.pois[0];
-    S.x = plaza.x + 30; S.z = plaza.z + 20;
+    // a quiet spot: flat terrain, no colliders around
+    const c = g.world.collision, t = g.world.terrain;
+    const free = (x, z) => {
+      const h0 = t.height(x, z);
+      if (h0 < 3) return false;
+      for (let a = 0; a < 12; a++) {
+        for (const r of [2, 5, 8]) {
+          const px = x + Math.cos(a * 0.5236) * r, pz = z + Math.sin(a * 0.5236) * r;
+          if (Math.abs(t.height(px, pz) - h0) > 0.12 || c.groundAt(px, pz, 999, 0.6) - h0 > 0.01) return false;
+        }
+      }
+      return true;
+    };
+    S.x = 0; S.z = 0;
+    outer: for (let r = 0; r < 700; r += 25) {
+      for (let a = 0; a < 16; a++) {
+        const x = Math.cos(a / 16 * 6.2832) * r, z = Math.sin(a / 16 * 6.2832) * r;
+        if (free(x, z)) { S.x = x; S.z = z; break outer; }
+      }
+    }
+    S.floor = c.groundAt(S.x, S.z, 999, 0.6);
+    // open water (deep enough to swim) for the swimming poses
+    S.wx = 1500; S.wz = 0;
+    for (let r = 300; r < 3000; r += 40) {
+      let found = false;
+      for (let a = 0; a < 12 && !found; a++) {
+        const x = Math.cos(a * 0.5236) * r, z = Math.sin(a * 0.5236) * r;
+        if ([[0, 0], [6, 0], [-6, 0], [0, 6], [0, -6]].every(([dx, dz]) => t.height(x + dx, z + dz) < -3)) { S.wx = x; S.wz = z; found = true; }
+      }
+      if (found) break;
+    }
     S.ready = true;
+    if (!S.full) S.clean();
+  };
+
+  /** Hides the world (everything but lights, sky and characters) and lays a plain ground disc: renders ~20x faster in software GL. */
+  S.clean = () => {
+    const keep = new Set(g.chars.map((c) => c.root));
+    S.hidden = [];
+    for (const k of g.scene.children) {
+      if (k.isLight || keep.has(k) || k.name === 'sky' || k.type === 'Object3D') continue;
+      S.hidden.push(k); k.visible = false;
+    }
+    g.addJumpPad({ x: 0, y: -50, z: 0, r: 1, vy: 0, vx: 0, vz: 0, expires: 1e9 });
+    const pad = g.dynPads[g.dynPads.length - 1];
+    const disc = pad.mesh.children[0].clone();
+    disc.material = disc.material.clone();
+    disc.material.color.setHex(0x7d8a64);
+    disc.material.roughness = 0.95;
+    disc.scale.set(180, 1, 180);
+    disc.position.set(S.x, S.floor - 0.09, S.z);
+    disc.receiveShadow = true;
+    g.scene.add(disc);
+    g.scene.remove(pad.mesh);
+    g.dynPads.splice(g.dynPads.indexOf(pad), 1); g.refreshPads();
+    S.disc = disc;
   };
 
   S.groundAt = (x, z) => g.world.collision.groundAt(x, z, 999, 0.6);
@@ -31,7 +84,8 @@ export function stageInit() {
   S.dummy = (i = 0) => g.bots[i].ch;
 
   /** Puts a character on the stage, upright and idle. */
-  S.reset = (c = g.player, o = {}) => {
+  S.reset = (c0 = g.player, o = {}) => {
+    const c = c0 || g.player;
     const x = o.x ?? S.x, z = o.z ?? S.z;
     c.alive = true; c.deadT = 0; c.deadGround = false; c.deadWater = false;
     c.hp = 100; c.shield = 0; c.swimming = false; c.crouching = false; c.sprinting = false; c.ads = false;
@@ -51,6 +105,8 @@ export function stageInit() {
     // a fresh animator so no earlier pose / spring state leaks in
     c.anim.dispose();
     c.anim = new c.anim.constructor(c);
+    if (c.held) { c.held.parent?.remove(c.held); c.held = null; }
+    c.heldId = null;
     c.refreshHeld();
     S.subject = c;
     return c;
@@ -74,6 +130,11 @@ export function stageInit() {
     const n = Math.round(sec / dt);
     for (let i = 0; i < n; i++) { if (fn) fn(i * dt, i); g.step(dt); }
   };
+
+  S.walkTo = (fwd, strafe, sprint, crouch, settle = 0.7) => { const p = S.subject; p.input.fwd = fwd; p.input.strafe = strafe; p.input.sprint = !!sprint; p.input.crouch = !!crouch; S.step(settle); };
+  S.stop = () => { const p = S.subject; p.input.fwd = 0; p.input.strafe = 0; p.input.sprint = false; p.input.crouch = false; p.input.fire = false; p.input.ads = false; };
+  /** n snapshots spread over sec seconds. */
+  S.frames = (sec, n, label = '') => { const dt = sec / n; for (let i = 0; i < n; i++) { S.snap(label + 't=' + (i * dt).toFixed(2)); S.step(dt); } };
 
   // ---- cameras ----------------------------------------------------------------------------------------------
   const cam = g.camera;
@@ -121,55 +182,13 @@ export function stageInit() {
     S.sheet.push(S.cur);
   };
   S.snap = (label = '', c = S.subject || g.player) => {
-    const [w, h] = S.tile;
     for (const v of S.cur.views) {
       S.cam(v, c);
       g.world.update(g.camera, c.pos, 0, g.time);
       g.render();
-      const cv = document.createElement('canvas');
-      cv.width = w; cv.height = h;
-      const x = cv.getContext('2d');
-      x.drawImage(g.canvas, 0, 0, w, h);
-      S.cur.frames.push({ v, label, cv });
+      // grab the pixels in the same task as the render (the drawing buffer is not preserved)
+      S.cur.frames.push({ v, label, url: g.canvas.toDataURL('image/jpeg', 0.92) });
     }
-  };
-  S.compose = (cols = 6) => {
-    const [w, h] = S.tile;
-    const bar = 22;
-    // rows: per scenario, per view
-    const rows = [];
-    for (const sc of S.sheet) {
-      rows.push({ title: sc.title });
-      for (const v of sc.views) {
-        const fr = sc.frames.filter((f) => f.v === v);
-        for (let i = 0; i < fr.length; i += cols) rows.push({ frames: fr.slice(i, i + cols), view: v });
-      }
-    }
-    const H = rows.reduce((a, r) => a + (r.title ? bar : h), 0);
-    const W = w * cols;
-    const cv = document.createElement('canvas');
-    cv.width = W; cv.height = H;
-    const x = cv.getContext('2d');
-    x.fillStyle = '#10141c'; x.fillRect(0, 0, W, H);
-    let y = 0;
-    for (const r of rows) {
-      if (r.title) {
-        x.fillStyle = '#1d2736'; x.fillRect(0, y, W, bar);
-        x.fillStyle = '#ffd86b'; x.font = 'bold 14px monospace'; x.textBaseline = 'middle';
-        x.fillText(r.title, 8, y + bar / 2);
-        y += bar;
-        continue;
-      }
-      r.frames.forEach((f, i) => {
-        x.drawImage(f.cv, i * w, y);
-        x.strokeStyle = '#10141c'; x.strokeRect(i * w, y, w, h);
-        x.fillStyle = 'rgba(0,0,0,0.55)'; x.fillRect(i * w, y, w, 16);
-        x.fillStyle = '#fff'; x.font = '11px monospace'; x.textBaseline = 'top';
-        x.fillText(`${f.v} ${f.label}`, i * w + 4, y + 2);
-      });
-      y += h;
-    }
-    return cv.toDataURL('image/png');
   };
   S.clearSheet = () => { S.sheet.length = 0; S.cur = null; };
 
