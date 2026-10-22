@@ -74,6 +74,10 @@ export class Bot {
     this.hunt = 0;
     this.lastEnemyDist = 0;
     this.dropTarget = null;
+    // sandbox flags: 'hostile' = normal AI (hunts the player), 'passive' = idle until hit, 'dummy' = never acts
+    this.mode = 'hostile';
+    this.provoked = false;
+    this.goalT = 0;
   }
 
   // ------------------------------------------------------------------------------------------------------------------------
@@ -90,6 +94,11 @@ export class Bot {
 
   onDamaged(attacker) {
     if (!attacker || attacker === this.ch || !attacker.alive) return;
+    if (this.game.sandbox) {
+      // sandbox enemies only ever fight the player; dummies never react
+      if (!attacker.isPlayer || this.mode === 'dummy') return;
+      this.provoked = true;
+    }
     if (!this.enemy || !this.enemy.alive || !this.enemyVisible) {
       this.enemy = attacker;
       this.noticeT = this.sk.react * 0.6;
@@ -112,6 +121,7 @@ export class Bot {
     const inp = ch.input;
     inp.firePressed = false;
     inp.jumpPressed = false;
+    if (this.mode === 'dummy' || (this.mode === 'passive' && !this.provoked)) return this.hold();
     if (ch.mode === 'bus') return this.updateBus();
     if (ch.mode === 'skydive' || ch.mode === 'glide') return this.updateDrop();
     if (ch.mode !== 'normal') return;
@@ -121,6 +131,13 @@ export class Bot {
       this.think();
     }
     this.execute(dt);
+  }
+
+  /** Standing still: sandbox dummies and passive enemies that have not been provoked. */
+  hold() {
+    const inp = this.ch.input;
+    inp.fwd = inp.strafe = 0;
+    inp.fire = inp.ads = inp.crouch = inp.sprint = inp.jump = false;
   }
 
   // ---- bus & landing --------------------------------------------------------------------------------------------------------
@@ -255,6 +272,22 @@ export class Bot {
       return;
     } else if (this.state === 'investigate') { this.state = 'loot'; this.goal = null; }
 
+    // sandbox: hostile enemies come looking for the player instead of looting
+    if (g.sandbox && this.mode === 'hostile') {
+      const target = g.player;
+      if (target && target.alive && target.mode !== 'bus' && Math.hypot(target.pos.x - ch.pos.x, target.pos.z - ch.pos.z) > 8) {
+        // plan a new route only when the player has moved away from where we are heading (route planning is the costly part)
+        if (!this.goal || this.reached(this.goal) || (now - this.goalT > 1.5 && Math.hypot(this.goal.x - target.pos.x, this.goal.z - target.pos.z) > 10)) {
+          this.goalT = now;
+          this.setGoal(target.pos.x, target.pos.z, true, 6);
+        }
+        this.state = 'travel';
+        this.lootTarget = null;
+        this.chooseWeapon(60, true);
+        return;
+      }
+    }
+
     // idle noobs
     if (sk.id === 'noob' && this.state !== 'idle' && Math.random() < 0.012 && !this.lootTarget) {
       this.state = 'idle'; this.idleT = 1.5 + Math.random() * 3;
@@ -332,6 +365,7 @@ export class Bot {
     const fx = -Math.sin(ch.yaw), fz = -Math.cos(ch.yaw);
     for (const c of g.chars) {
       if (c === ch || !c.alive || c.mode === 'bus') continue;
+      if (g.sandbox && !c.isPlayer) continue; // sandbox enemies do not fight each other
       const dx = c.pos.x - ch.pos.x, dz = c.pos.z - ch.pos.z;
       const d2 = dx * dx + dz * dz;
       let range = sk.vis;
@@ -357,7 +391,7 @@ export class Bot {
       }
       // choose whether to engage at all: unarmed bots keep their distance unless cornered or hit
       const d = Math.hypot(seen.pos.x - ch.pos.x, seen.pos.z - ch.pos.z);
-      const armed = this.hasWeapon();
+      const armed = this.hasWeapon() || g.sandbox && this.mode === 'hostile'; // sandbox enemies always engage (melee included)
       const wasHit = now - ch.lastDamageT < 6;
       const engage = armed || d < 4.5 && (wasHit || sk.id === 'pro' && Math.random() < 0.3);
       const flee = !armed && d >= 4.5 && wasHit;

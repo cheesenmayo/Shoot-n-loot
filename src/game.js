@@ -12,6 +12,7 @@ import { PlayerController } from './entities/player.js';
 import { Bot, makeNames } from './entities/bot.js';
 import { PRESETS, settings, loadSettings, saveSettings, touchEnabled, coarsePointer } from './settings.js';
 import { TouchControls } from './touch.js';
+import { Sandbox } from './sandbox.js';
 import { shuffle } from './util.js';
 import { WORLD } from './world/terrain.js';
 import { RARITIES } from './items.js';
@@ -49,6 +50,8 @@ export class Game {
     this.pendingResult = null;
     this.forcedJump = false;
     this.touchMode = false;
+    this.sandbox = false; // sandbox mode: no bus, storm or placement; see sandbox.js
+    this.sbx = null;
     this.hud = new HUD(this, uiRoot);
     this.touch = new TouchControls(this, this.hud.$('#touch'));
     addEventListener('resize', () => this.onResize());
@@ -109,6 +112,7 @@ export class Game {
     this.storm = new Storm(this);
     this.bus = new Bus(this);
     this.controller = new PlayerController(this, null, this.canvas);
+    this.sbx = new Sandbox(this);
     this.audio.setVolume(settings.volume);
     this.applyGraphics(settings.graphics);
     this.allPads = this.world.jumpPads.slice();
@@ -135,7 +139,7 @@ export class Game {
   }
 
   // ---- queries used by systems ------------------------------------------------------------------------------------------------------------
-  inputEnabled() { return !this.paused && (this.state === 'bus' || this.state === 'playing' || this.state === 'dead'); }
+  inputEnabled() { return !this.paused && !this.sbx?.open && (this.state === 'bus' || this.state === 'playing' || this.state === 'dead'); }
   nearPlayer(pos, r) { return Math.hypot(pos.x - this.camera.position.x, pos.z - this.camera.position.z) < r; }
   jumpPads() { return this.allPads; }
   shouldDrawTracer(ch, end) {
@@ -168,6 +172,7 @@ export class Game {
 
   // ---- match lifecycle ------------------------------------------------------------------------------------------------------------------------------
   clearMatch() {
+    this.sbx?.end();
     for (const c of this.chars) c.dispose();
     this.chars = [];
     this.bots = [];
@@ -194,20 +199,11 @@ export class Game {
   startMatch() {
     if (this.state === 'loading') return;
     this.clearMatch();
-    this.paused = false;
-    this.pendingResult = null;
-    this.resultShown = false;
-    clearTimeout(this.resultTimer);
-    this.hud.show('title', false);
-    this.hud.show('result', false);
-    this.hud.show('pause', false);
-    this.hud.showHud(true);
-    this.hud.mapOpen = false;
-    this.hud.$('#bigmap').classList.add('hidden');
+    this.enterSession(false);
 
     const names = makeNames(BOT_COUNT);
     const skills = shuffle([...Array(12).fill('pro'), ...Array(19).fill('mid'), ...Array(18).fill('noob')]);
-    const player = new Character(this, { id: 0, name: 'You', isPlayer: true, seed: 3, look: { shirt: 0xffb62e, pants: 0x27324a, hat: null, hair: 0x2a1a10, pack: 0x2e6bd8 }, gliderColor: 0x35e8ff });
+    const player = this.createPlayer();
     this.player = player;
     this.chars.push(player);
     for (let i = 0; i < BOT_COUNT; i++) {
@@ -239,8 +235,56 @@ export class Game {
     this.hud.syncSettings();
   }
 
+  /** Shared start-up for matches and the sandbox: reset flags, hide the menus, show the HUD. */
+  enterSession(sandbox) {
+    this.sandbox = sandbox;
+    this.paused = false;
+    this.pendingResult = null;
+    this.resultShown = false;
+    clearTimeout(this.resultTimer);
+    this.hud.setSandbox(sandbox);
+    this.hud.show('title', false);
+    this.hud.show('result', false);
+    this.hud.show('pause', false);
+    this.hud.showHud(true);
+    this.hud.mapOpen = false;
+    this.hud.$('#bigmap').classList.add('hidden');
+  }
+
+  createPlayer() {
+    return new Character(this, { id: 0, name: 'You', isPlayer: true, seed: 3, look: { shirt: 0xffb62e, pants: 0x27324a, hat: null, hair: 0x2a1a10, pack: 0x2e6bd8 }, gliderColor: 0x35e8ff });
+  }
+
+  /** Sandbox: the player alone on the ground at Parkour Plaza with the tools panel (B). No bus, storm or result screen. */
+  startSandbox() {
+    if (this.state === 'loading') return;
+    this.clearMatch();
+    this.enterSession(true);
+    const player = this.createPlayer();
+    this.player = player;
+    this.chars.push(player);
+    this.aliveCount = 1;
+    this.loot.populate();
+    this.controller.char = player;
+    this.controller.spectate.target = null;
+    this.forcedJump = false;
+    this.busStartT = this.matchStartT = this.time;
+    this.state = 'playing';
+    this.sbx.begin();
+    this.controller.distSm = this.controller.offSm = this.controller.heightSm = null;
+    this.controller.update(0);
+    this.world.terrain.update(this.camera.position, true);
+    this.audio.init();
+    if (this.touchMode) this.enterFullscreen();
+    this.hud.toast(this.touchMode ? 'Sandbox · tap the flask button for the tools' : 'Sandbox · press B for the tools');
+    this.controller.requestLock();
+    this.hud.syncSettings();
+  }
+
   returnToMenu() {
     this.paused = false;
+    this.sandbox = false;
+    this.hud.setSandbox(false);
     clearTimeout(this.resultTimer);
     this.clearMatch();
     this.controller.char = null;
@@ -259,6 +303,7 @@ export class Game {
     if (this.state === 'menu' || this.state === 'loading') return;
     // Esc both drops pointer lock and (in some browsers) fires a keydown: ignore the echo
     if (performance.now() - (this.pauseChangedAt || 0) < 250) return;
+    if (this.sbx?.open) { this.sbx.closePanel(true); return; } // Esc closes the sandbox panel first
     if (this.paused) this.resume(); else this.pause();
   }
   releaseLock() {
@@ -268,6 +313,7 @@ export class Game {
   }
   pause() {
     if (this.paused || !['bus', 'playing', 'dead', 'ended'].includes(this.state)) return;
+    if (this.sbx?.open) this.sbx.closePanel(true, false);
     this.pauseChangedAt = performance.now();
     this.paused = true;
     this.touch.setActive(false);
@@ -275,15 +321,15 @@ export class Game {
     this.audio.setWind(0);
     this.releaseLock();
   }
-  resume() {
+  resume(noLock = false) {
     this.pauseChangedAt = performance.now();
     this.paused = false;
     this.hud.show('pause', false);
-    this.controller.requestLock();
+    if (!noLock) this.controller.requestLock();
   }
   onLockLost() {
     if (this.touchMode || this.lockReleasing || this.resultShown) return;
-    if (['bus', 'playing', 'dead'].includes(this.state) && !this.paused && !this.hud.mapOpen) this.pause();
+    if (['bus', 'playing', 'dead'].includes(this.state) && !this.paused && !this.hud.mapOpen && !this.sbx?.open) this.pause();
   }
   spectate() {
     this.resultShown = false;
@@ -324,14 +370,12 @@ export class Game {
       this.hud.hitmarker(info.headshot);
       this.audio.play(info.headshot ? 'headshot' : 'hit', null, { vol: 0.9 });
       this.hud.damageNumber(new THREE.Vector3(victim.pos.x, victim.pos.y + 1.9, victim.pos.z), amount, info.headshot);
+      if (this.sandbox) this.sbx.onHit(victim, amount, info);
     }
     void p;
   }
 
   onElimination(victim, attacker, info, wasAir) {
-    const placement = this.aliveCount;
-    this.aliveCount--;
-    victim.placement = placement;
     const killer = attacker && attacker !== victim ? attacker : null;
     let line;
     const icon = info.weapon?.icon || '🔫';
@@ -340,13 +384,17 @@ export class Game {
     else if (info.type === 'fall') line = `${victim.name} fell to their death 💀`;
     else line = `${victim.name} was eliminated`;
     this.hud.feed(line, killer?.isPlayer ? 'me' : victim.isPlayer ? 'die' : '');
-    this.loot.dropAll(victim);
+    if (!(this.sandbox && victim.isPlayer)) this.loot.dropAll(victim); // the sandbox player keeps their inventory
     this.fx.teleport(victim.pos, 'cyan');
     this.audio.play('elim', victim.pos, { max: 120, vol: 0.5 });
     if (killer) {
       killer.kills++;
       if (killer.isPlayer) this.hud.elimToast(victim.name, killer.kills);
     }
+    if (this.sandbox) { this.sbx.onElimination(victim, killer, info); return; } // no placement or match end in the sandbox
+    const placement = this.aliveCount;
+    this.aliveCount--;
+    victim.placement = placement;
     if (victim.isPlayer) {
       this.state = 'dead';
       this.audio.play('elim', null);
@@ -361,7 +409,7 @@ export class Game {
   }
 
   endMatch() {
-    if (this.state === 'ended') return;
+    if (this.state === 'ended' || this.sandbox) return;
     const winner = this.chars.find((c) => c.alive);
     if (winner?.isPlayer) {
       this.state = 'ended';
@@ -420,7 +468,8 @@ export class Game {
 
   step(dt) {
     if (this.state === 'loading') return;
-    this.touch.setActive(this.touchMode && ['bus', 'playing', 'dead'].includes(this.state) && !this.paused && !this.resultShown && !this.hud.mapOpen);
+    const sbx = this.sandbox ? this.sbx : null;
+    this.touch.setActive(this.touchMode && ['bus', 'playing', 'dead'].includes(this.state) && !this.paused && !this.resultShown && !this.hud.mapOpen && !sbx?.open);
     const inMatch = this.player && this.state !== 'menu';
     if (!inMatch) {
       this.time += dt;
@@ -433,22 +482,27 @@ export class Game {
       this.world.update(this.camera, this.camera.position, 0, this.time);
       return;
     }
-    this.time += dt;
+    // sandbox: the simulation runs on scaled time and stands still while the tools panel is open (camera and HUD keep going)
+    const sdt = sbx ? sbx.simDt(dt) : dt;
+    this.time += sdt;
     const p = this.player;
     const b = this.bus;
 
-    // bus
-    b.update(dt);
-    for (const c of this.chars) if (c.alive && c.mode === 'bus') { c.pos.copy(b.pos); c.pos.y -= 3; }
-    // everyone still aboard is ejected once the bus is leaving the island
-    const leaving = b.active && b.progress > 0.5 && Math.hypot(b.pos.x, b.pos.z) > WORLD.islandR - 90;
-    if ((!b.active || leaving) && !this.forcedJump && this.chars.some((c) => c.mode === 'bus' && c.alive)) {
-      this.forcedJump = true;
-      for (const c of this.chars) if (c.mode === 'bus' && c.alive) this.jumpFromBus(c);
+    if (sbx) sbx.update(dt, sdt);
+    else {
+      // bus
+      b.update(dt);
+      for (const c of this.chars) if (c.alive && c.mode === 'bus') { c.pos.copy(b.pos); c.pos.y -= 3; }
+      // everyone still aboard is ejected once the bus is leaving the island
+      const leaving = b.active && b.progress > 0.5 && Math.hypot(b.pos.x, b.pos.z) > WORLD.islandR - 90;
+      if ((!b.active || leaving) && !this.forcedJump && this.chars.some((c) => c.mode === 'bus' && c.alive)) {
+        this.forcedJump = true;
+        for (const c of this.chars) if (c.mode === 'bus' && c.alive) this.jumpFromBus(c);
+      }
+      this.storm.update(dt, this.time);
     }
-    this.storm.update(dt, this.time);
     this.controller.update(dt);
-    for (const bot of this.bots) bot.update(dt);
+    for (const bot of this.bots) bot.update(sdt);
 
     // visibility / level of detail for characters
     const cp = this.camera.position;
@@ -465,9 +519,9 @@ export class Game {
         c.root.traverse((o) => { if (o.isMesh) o.castShadow = wantShadow; });
       }
     }
-    for (const c of this.chars) c.update(dt);
+    for (const c of this.chars) c.update(sdt);
     this.separate();
-    this.combat.update(dt);
+    this.combat.update(sdt);
 
     // temporary jump pads
     for (let i = this.dynPads.length - 1; i >= 0; i--) {
@@ -478,10 +532,10 @@ export class Game {
       }
     }
 
-    this.loot.update(dt, cp, this.time);
-    this.fx.update(dt, this.camera, this.renderer);
+    this.loot.update(sdt, cp, this.time);
+    this.fx.update(sdt, this.camera, this.renderer);
     const focus = p.alive || !this.controller.spectate.target ? p.pos : this.controller.spectate.target.pos;
-    this.world.update(this.camera, focus, dt, this.time);
+    this.world.update(this.camera, focus, sdt, this.time);
     this.hud.update(dt, this.fps);
 
     // ambience
