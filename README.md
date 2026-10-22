@@ -26,7 +26,7 @@ If your browser refuses pointer lock, move the mouse to look, or use the arrow k
 | **Space** | jump · jump from bus · open glider | **R** | reload |
 | **C** | crouch | **E** | pick up · *hold* to open a chest |
 | **1–6 / wheel** | select slot | **G** | drop selected item |
-| **M / Tab** | map | **X** | swap shoulder |
+| **M / Tab** | map | **X** / **V** | swap shoulder / first person |
 | **Esc** | pause / settings | **← → ↑ ↓** | look (when mouse lock is unavailable) |
 
 In the air: **W** dives, **S** slows, **A/D** steer, **Space** deploys the glider early (it opens automatically near the ground).

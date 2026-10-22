@@ -69,6 +69,7 @@ export class PlayerController {
       if (!this.locked) this.game.onLockLost();
     });
     window.addEventListener('blur', () => { this.keys.clear(); this.mouseDown = false; this.rmbDown = false; });
+    d.addEventListener('visibilitychange', () => { if (d.hidden) this.game.pause(); });
   }
 
   requestLock() {
@@ -103,6 +104,7 @@ export class PlayerController {
     if (!ch) return;
     if (code === 'KeyM' || code === 'Tab') { g.hud.toggleMap(); return; }
     if (code === 'KeyX') this.shoulder *= -1;
+    if (code === 'KeyV') { this.fpv = !this.fpv; g.hud.toast(this.fpv ? 'First person' : 'Third person'); }
     if (code === 'F3') settings.showFps = !settings.showFps;
     if (!ch.alive) {
       if (code === 'KeyE' || code === 'ArrowRight' || code === 'KeyD') this.cycleSpectate(1);
@@ -262,11 +264,17 @@ export class PlayerController {
     _f.set(-Math.sin(this.yaw) * cp, sp, -Math.cos(this.yaw) * cp); // forward
     _r.set(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
 
+    const fp = this.fpv && ch.alive && ch.mode === 'normal';
+    if (ch.alive) ch.model.head.visible = !fp;
     if (this.scoped) {
       // first person through the scope
       ch.eyePos(_v);
       cam.position.copy(_v).addScaledVector(_f, 0.25);
       ch.root.visible = false;
+    } else if (fp) {
+      ch.eyePos(_v);
+      cam.position.copy(_v).addScaledVector(_f, 0.18);
+      ch.root.visible = true;
     } else {
       const want = _v.copy(pivot).addScaledVector(_r, offset).addScaledVector(_f, -dist);
       // collision: pull the camera in front of walls

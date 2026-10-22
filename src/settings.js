@@ -33,7 +33,7 @@ export const PRESETS = {
 };
 
 const KEY = 'shootnloot.settings.v1';
-const defaults = { graphics: 'default', sensitivity: 1.0, volume: 0.6, fov: 70, invertY: false, showFps: false };
+const defaults = { graphics: 'default', sensitivity: 1.0, volume: 0.6, fov: 70, invertY: false, showFps: false, chosen: false };
 
 export const settings = { ...defaults };
 

@@ -83,8 +83,9 @@ export class Game {
     this.world.paintMap().then(() => { this.mapReady = true; });
   }
 
-  applyGraphics(id) {
+  applyGraphics(id, byUser = false) {
     settings.graphics = id;
+    if (byUser) settings.chosen = true;
     saveSettings();
     const g = PRESETS[id];
     this.graphics = g;
@@ -351,8 +352,27 @@ export class Game {
     if (!(dt > 0)) dt = 1 / 60;
     dt = Math.min(dt, 0.05);
     this.fps += (1 / dt - this.fps) * 0.1;
+    this.autoTune(dt);
     this.step(dt);
     this.render();
+  }
+
+  /** First run only: if the title-screen fly-over is slow, switch to Low graphics. */
+  autoTune(dt) {
+    if (this.state !== 'menu' || settings.chosen || !this.mapReady) return;
+    const t = (this.tune ||= { t: 0, samples: [] });
+    t.t += dt;
+    if (t.t > 1.5) t.samples.push(dt);
+    if (t.t < 5) return;
+    settings.chosen = true;
+    const s = t.samples.sort((a, b) => a - b);
+    const median = s[Math.floor(s.length / 2)] || 0;
+    if (median > 1 / 22 && settings.graphics !== 'low') {
+      this.applyGraphics('low');
+      settings.chosen = true;
+      saveSettings();
+      this.hud.setNote('Slow graphics detected, so Low was selected. You can change this below.');
+    } else saveSettings();
   }
 
   render() { this.renderer.render(this.scene, this.camera); }

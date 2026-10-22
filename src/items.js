@@ -65,13 +65,13 @@ melee({ id: 'sledge', name: 'Sledgehammer', icon: '🔨', model: 'sledge', dmg: 
 // ---- throwables ------------------------------------------------------------------------------------------------------------------------------------------------
 const throwable = (o) => add({ kind: 'throw', stack: 6, noise: 60, minR: 0, maxR: 4, weight: 8, tags: ['explosive'], throwSpeed: 21, gravity: 20, bounce: 0.4, ...o });
 throwable({ id: 'frag', name: 'Frag Grenade', icon: '💣', model: 'frag', dmg: 100, radius: 6.5, fuse: 2.2, stack: 6, weight: 12 });
-throwable({ id: 'impulse', name: 'Impulse Grenade', icon: '🌀', model: 'impulse', dmg: 0, radius: 9, fuse: 1.3, impulse: 26, stack: 4, weight: 10, tags: ['parkour'], bounce: 0.3 });
+throwable({ id: 'impulse', desc: 'Shoves everything nearby. Throw it at your feet to launch yourself.', name: 'Impulse Grenade', icon: '🌀', model: 'impulse', dmg: 0, radius: 9, fuse: 1.3, impulse: 26, stack: 4, weight: 10, tags: ['parkour'], bounce: 0.3 });
 throwable({ id: 'dynamite', name: 'Dynamite', icon: '🧨', model: 'dynamite', dmg: 140, radius: 8, fuse: 3.4, stack: 4, weight: 7, tags: ['west', 'explosive'], throwSpeed: 18 });
-throwable({ id: 'boogie', name: 'Boogie Bomb', icon: '🪩', model: 'boogie', dmg: 0, radius: 9, fuse: 1.1, dance: 5.5, stack: 4, weight: 4, minR: 1, tags: ['explosive'], bounce: 0.5 });
+throwable({ id: 'boogie', desc: 'Makes anyone nearby dance helplessly.', name: 'Boogie Bomb', icon: '🪩', model: 'boogie', dmg: 0, radius: 9, fuse: 1.1, dance: 5.5, stack: 4, weight: 4, minR: 1, tags: ['explosive'], bounce: 0.5 });
 
 // ---- gadgets ------------------------------------------------------------------------------------------------------------------------------------------------------
-add({ id: 'grappler', name: 'Grappler', kind: 'gadget', icon: '🪝', model: 'grappler', stack: 12, charges: 6, range: 70, weight: 9, tags: ['parkour'], minR: 0, maxR: 4, noise: 40, gadget: 'grapple' });
-add({ id: 'launchpad', name: 'Launch Pad', kind: 'gadget', icon: '⏫', model: 'launchpad', stack: 4, charges: 2, weight: 7, tags: ['parkour'], minR: 0, maxR: 3, noise: 50, gadget: 'launchpad' });
+add({ id: 'grappler', desc: 'Fire at any surface to swing and pull yourself over. Jump to let go.', name: 'Grappler', kind: 'gadget', icon: '🪝', model: 'grappler', stack: 12, charges: 6, range: 70, weight: 9, tags: ['parkour'], minR: 0, maxR: 4, noise: 40, gadget: 'grapple' });
+add({ id: 'launchpad', desc: 'Place it, then run over it to be launched skyward.', name: 'Launch Pad', kind: 'gadget', icon: '⏫', model: 'launchpad', stack: 4, charges: 2, weight: 7, tags: ['parkour'], minR: 0, maxR: 3, noise: 50, gadget: 'launchpad' });
 
 // ---- consumables -------------------------------------------------------------------------------------------------------------------------------------------------------
 const cons = (o) => add({ kind: 'consume', stack: 6, minR: 0, maxR: 4, weight: 10, tags: ['heal'], hp: 0, shield: 0, hpCap: 100, shieldCap: 100, time: 1, ...o });
@@ -82,10 +82,10 @@ cons({ id: 'bandage', name: 'Bandage', icon: '🩹', model: 'bandage', hp: 15, h
 cons({ id: 'medkit', name: 'Medkit', icon: '🧰', model: 'medkit', hp: 100, hpCap: 100, time: 7.5, stack: 3, weight: 9, minR: 1 });
 cons({ id: 'small_shield', name: 'Mini Shield', icon: '🧪', model: 'small_shield', shield: 25, shieldCap: 50, time: 2.4, stack: 6, weight: 22, tags: ['shield'] });
 cons({ id: 'big_shield', name: 'Shield Potion', icon: '🔵', model: 'big_shield', shield: 50, shieldCap: 100, time: 4.6, stack: 3, weight: 11, minR: 1, tags: ['shield'] });
-cons({ id: 'chug_jug', name: 'Chug Jug', icon: '🏺', model: 'chug_jug', hp: 100, shield: 100, time: 12, stack: 1, weight: 2, minR: 3, tags: ['shield'] });
-cons({ id: 'slurp', name: 'Slurp Juice', icon: '🧃', model: 'slurp', hot: { hp: 30, shield: 30, dur: 14 }, time: 1.6, stack: 3, weight: 5, minR: 2, tags: ['shield'] });
-cons({ id: 'jumpple', name: 'Jumpple', icon: '🍏', model: 'jumpple', hp: 5, time: 1.0, stack: 4, weight: 8, buff: { speed: 1.38, jump: 1.6, dur: 30 }, tags: ['parkour', 'food'], maxR: 2 });
-cons({ id: 'floorange', name: 'Floorange', icon: '🍊', model: 'floorange', hp: 10, time: 0.55, stack: 4, weight: 8, airOnly: true, tags: ['floorange', 'food'], maxR: 1 });
+cons({ id: 'chug_jug', desc: 'Full health and shield.', name: 'Chug Jug', icon: '🏺', model: 'chug_jug', hp: 100, shield: 100, time: 12, stack: 1, weight: 2, minR: 3, tags: ['shield'] });
+cons({ id: 'slurp', desc: 'Restores health and shield over time.', name: 'Slurp Juice', icon: '🧃', model: 'slurp', hot: { hp: 30, shield: 30, dur: 14 }, time: 1.6, stack: 3, weight: 5, minR: 2, tags: ['shield'] });
+cons({ id: 'jumpple', desc: 'Run faster and jump higher for 30 seconds.', name: 'Jumpple', icon: '🍏', model: 'jumpple', hp: 5, time: 1.0, stack: 4, weight: 8, buff: { speed: 1.38, jump: 1.6, dur: 30 }, tags: ['parkour', 'food'], maxR: 2 });
+cons({ id: 'floorange', desc: 'Only edible mid-air. Teleports you to the ground with no fall damage and heals 10 HP.', name: 'Floorange', icon: '🍊', model: 'floorange', hp: 10, time: 0.55, stack: 4, weight: 8, airOnly: true, tags: ['floorange', 'food'], maxR: 1 });
 
 export const ITEM_LIST = Object.values(ITEMS);
 export const isStackable = (d) => d.kind === 'throw' || d.kind === 'consume' || d.kind === 'gadget';

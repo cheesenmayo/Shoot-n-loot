@@ -25,7 +25,7 @@ const KEYS = `
     <div><b>LMB</b> fire / use item</div><div><b>RMB</b> aim down sights</div>
     <div><b>E</b> pick up · hold to open chests</div><div><b>R</b> reload</div>
     <div><b>1-6 / Wheel</b> switch item</div><div><b>G</b> drop item</div>
-    <div><b>M / Tab</b> map</div><div><b>X</b> swap shoulder</div>
+    <div><b>M / Tab</b> map</div><div><b>X</b> swap shoulder · <b>V</b> first person</div>
     <div><b>← → ↑ ↓</b> look (no mouse lock)</div><div><b>Esc</b> pause</div>
   </div>`;
 
@@ -46,6 +46,8 @@ export class HUD {
       <div class="title-wrap">
         <div class="logo">Shoot 'n' Loot<small>Battle Royale</small></div>
         <div class="tagline">50 PLAYERS · 8 LOCATIONS · 1 VICTORY ROYALE</div>
+        <div class="tagline" style="font-size:12px;opacity:.65">Best on a desktop browser with keyboard and mouse</div>
+        <div class="tagline" id="gfx-note" style="color:#7fe8ff"></div>
         <button class="btn" id="btn-play">Play</button>
         <div class="row" style="align-items:stretch">
           <div class="panel">${settingsHTML('t')}</div>
@@ -138,7 +140,7 @@ export class HUD {
         if (!b) return;
         g.audio.init();
         g.audio.play('click');
-        g.applyGraphics(b.dataset.g);
+        g.applyGraphics(b.dataset.g, true);
         this.syncSettings();
       });
     });
@@ -184,6 +186,8 @@ export class HUD {
     this.$('#loadtxt').textContent = label;
   }
 
+  setNote(msg) { this.$('#gfx-note').textContent = msg; }
+
   showHud(on) { this.$('#hud').classList.toggle('hidden', !on); }
 
   // ---- notifications -----------------------------------------------------------------------------------------------------------------------
@@ -199,13 +203,19 @@ export class HUD {
 
   stormMessage(msg) { this.toast(msg); }
 
-  pickupToast(name, rarity, isAmmo) {
+  pickupToast(name, rarity, isAmmo, desc = '') {
     const box = this.$('#pickups');
     const d = document.createElement('div');
     d.textContent = name;
+    if (desc) {
+      const sm = document.createElement('small');
+      sm.textContent = desc;
+      sm.style.cssText = 'display:block;font-weight:600;opacity:.8;font-size:12px;max-width:260px';
+      d.appendChild(sm);
+    }
     d.style.borderRightColor = isAmmo ? '#ddd' : RARITIES[rarity].css;
     box.appendChild(d);
-    setTimeout(() => d.remove(), 1800);
+    setTimeout(() => d.remove(), desc ? 3600 : 1800);
     while (box.children.length > 4) box.firstChild.remove();
   }
 
@@ -479,6 +489,15 @@ export class HUD {
       ctx.strokeStyle = '#000';
       ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(x, y, big ? 7 : 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      if (!big) {
+        ctx.font = 'bold 10px "Trebuchet MS", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+        ctx.strokeText(p.name, x, y + 14);
+        ctx.fillStyle = '#fff';
+        ctx.fillText(p.name, x, y + 14);
+      }
       if (big) {
         ctx.font = 'bold 22px "Trebuchet MS", sans-serif';
         ctx.textAlign = 'center';

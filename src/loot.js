@@ -180,7 +180,7 @@ export class LootManager {
     if (ch.isPlayer) {
       this.game.audio.play(d.ammo ? 'ammo' : 'pickup', null);
       const name = d.ammo ? AMMO[d.ammo].name : d.stack.def.name;
-      this.game.hud?.pickupToast(name, d.ammo ? 0 : d.stack.rarity, d.ammo ? true : false);
+      this.game.hud?.pickupToast(name, d.ammo ? 0 : d.stack.rarity, d.ammo ? true : false, d.ammo ? '' : d.stack.def.desc || '');
     }
     if (empty) this.removeDrop(d);
     else if (d.mesh) d.mesh.userData.dirty = true;
