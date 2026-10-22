@@ -127,8 +127,8 @@ export class PartBuilder {
       if (f === 2) fa = [mid, mid, mid, mid];
       else if (f === 3) fa = [ao, ao, ao, ao];
       else fa = [ao, ao, mid, mid];
-      if (flip) this._quad(D, C, B, A, rgb, [fa[3], fa[2], fa[1], fa[0]]);
-      else this._quad(A, B, C, D, rgb, fa);
+      if (flip) this._quad(A, B, C, D, rgb, fa);
+      else this._quad(D, C, B, A, rgb, [fa[3], fa[2], fa[1], fa[0]]);
     }
     return this;
   }
@@ -160,8 +160,8 @@ export class PartBuilder {
       const am = (c0 + c1) / 2, sm = (s0 + s1) / 2;
       _n.set(am, slope, sm).normalize().transformDirection(_m);
       _n.x *= sgn;
-      const verts = sgn < 0 ? [p3, p2, p1, p0] : [p0, p1, p2, p3];
-      const fa = sgn < 0 ? [1, 1, ao, ao] : [ao, ao, 1, 1];
+      const verts = sgn < 0 ? [p0, p1, p2, p3] : [p3, p2, p1, p0];
+      const fa = sgn < 0 ? [ao, ao, 1, 1] : [1, 1, ao, ao];
       for (let k = 0; k < 4; k++) {
         const p = verts[k];
         this.pos.push(p[0], p[1], p[2]);
