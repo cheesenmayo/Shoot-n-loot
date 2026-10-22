@@ -251,6 +251,7 @@ export class Character {
 
   canUse(def) {
     if (def.airOnly) return this.grounded || this.swimming || this.mode !== 'normal' ? 'Can only be eaten mid-air!' : null;
+    if (def.buff) return this.buffs.speedT > def.buff.dur * 0.8 ? 'Already super-charged' : null;
     if (def.hp && !def.shield && !def.hot && this.hp >= def.hpCap) return 'Health is full';
     if (def.shield && !def.hp && this.shield >= def.shieldCap) return 'Shield is full';
     if (def.hp && def.shield && this.hp >= def.hpCap && this.shield >= def.shieldCap) return 'Already at full';

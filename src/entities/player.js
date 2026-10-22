@@ -37,7 +37,7 @@ export class PlayerController {
     d.addEventListener('keydown', (e) => this.onKey(e, true));
     d.addEventListener('keyup', (e) => this.onKey(e, false));
     d.addEventListener('mousemove', (e) => {
-      if (!this.locked || !this.game.inputEnabled()) return;
+      if ((!this.locked && !this.fallbackLook) || !this.game.inputEnabled()) return;
       const sens = 0.0022 * settings.sensitivity * (this.char.ads ? Math.max(0.25, this.fov / settings.fov) : 1);
       this.yaw -= e.movementX * sens;
       this.pitch -= e.movementY * sens * (settings.invertY ? -1 : 1);
@@ -65,16 +65,26 @@ export class PlayerController {
     }, { passive: true });
     d.addEventListener('pointerlockchange', () => {
       this.locked = d.pointerLockElement === this.canvas;
+      if (this.locked) { this.fallbackLook = false; this.canvas.style.cursor = ''; }
       if (!this.locked) this.game.onLockLost();
     });
     window.addEventListener('blur', () => { this.keys.clear(); this.mouseDown = false; this.rmbDown = false; });
   }
 
   requestLock() {
+    const fail = () => {
+      if (this.fallbackLook) return;
+      this.fallbackLook = true;
+      this.canvas.style.cursor = 'crosshair';
+      this.game.hud?.toast('Pointer lock unavailable: move the mouse to look (arrow keys also turn)');
+    };
     try {
       const p = this.canvas.requestPointerLock?.();
-      if (p && p.catch) p.catch(() => {});
-    } catch { /* ignore */ }
+      if (!this.canvas.requestPointerLock) fail();
+      else if (p && p.then) p.then(() => {}, fail);
+    } catch { fail(); }
+    clearTimeout(this.lockTimer);
+    this.lockTimer = setTimeout(() => { if (!this.locked && this.game.inputEnabled()) fail(); }, 700);
   }
 
   onKey(e, down) {
@@ -150,8 +160,8 @@ export class PlayerController {
     const dead = !ch.alive;
 
     if (enabled && !dead) {
-      inp.fwd = (k.has('KeyW') || k.has('ArrowUp') ? 1 : 0) - (k.has('KeyS') || k.has('ArrowDown') ? 1 : 0);
-      inp.strafe = (k.has('KeyD') || k.has('ArrowRight') ? 1 : 0) - (k.has('KeyA') || k.has('ArrowLeft') ? 1 : 0);
+      inp.fwd = (k.has('KeyW') ? 1 : 0) - (k.has('KeyS') ? 1 : 0);
+      inp.strafe = (k.has('KeyD') ? 1 : 0) - (k.has('KeyA') ? 1 : 0);
       inp.jump = k.has('Space');
       inp.sprint = k.has('ShiftLeft') || k.has('ShiftRight');
       inp.crouch = k.has('KeyC') || k.has('ControlLeft');
@@ -162,6 +172,15 @@ export class PlayerController {
       inp.jump = inp.sprint = inp.crouch = inp.fire = inp.ads = false;
     }
 
+    if (enabled) {
+      const turn = (k.has('ArrowLeft') ? 1 : 0) - (k.has('ArrowRight') ? 1 : 0);
+      const tilt = (k.has('ArrowUp') ? 1 : 0) - (k.has('ArrowDown') ? 1 : 0);
+      if (turn || tilt) {
+        const sens = 1.9 * settings.sensitivity * dt;
+        this.yaw += turn * sens;
+        this.pitch = clamp(this.pitch + tilt * sens * 0.7, -1.45, 1.35);
+      }
+    }
     if (!dead && ch.mode !== 'bus') {
       ch.yaw = this.yaw;
       ch.pitch = this.pitch;
@@ -207,7 +226,7 @@ export class PlayerController {
   updateCamera(dt) {
     const g = this.game, ch = this.char, cam = g.camera, w = g.world;
     const target = this.cameraTarget();
-    let dist = 3.4, offset = 0.62 * this.shoulder, height = ch.crouching ? 1.15 : 1.55;
+    let dist = 3.2, offset = 0.85 * this.shoulder, height = ch.crouching ? 1.2 : 1.6;
     let fovT = settings.fov;
     this.scoped = false;
     let pivot;

@@ -26,6 +26,7 @@ const KEYS = `
     <div><b>E</b> pick up · hold to open chests</div><div><b>R</b> reload</div>
     <div><b>1-6 / Wheel</b> switch item</div><div><b>G</b> drop item</div>
     <div><b>M / Tab</b> map</div><div><b>X</b> swap shoulder</div>
+    <div><b>← → ↑ ↓</b> look (no mouse lock)</div><div><b>Esc</b> pause</div>
   </div>`;
 
 export class HUD {
@@ -46,18 +47,21 @@ export class HUD {
         <div class="logo">Shoot 'n' Loot<small>Battle Royale</small></div>
         <div class="tagline">50 PLAYERS · 8 LOCATIONS · 1 VICTORY ROYALE</div>
         <button class="btn" id="btn-play">Play</button>
-        <div class="panel">${settingsHTML('t')}</div>
-        <div class="panel">${KEYS}</div>
+        <div class="row" style="align-items:stretch">
+          <div class="panel">${settingsHTML('t')}</div>
+          <div class="panel"><div class="label">Controls</div>${KEYS}</div>
+        </div>
       </div>
     </div>
 
     <div id="screen-pause" class="screen dim hidden">
       <div class="title-wrap">
         <div class="logo" style="font-size:56px">Paused</div>
-        <button class="btn" id="btn-resume">Resume</button>
-        <div class="panel">${settingsHTML('p')}</div>
-        <div class="panel">${KEYS}</div>
-        <button class="btn alt" id="btn-quit">Leave match</button>
+        <div class="row"><button class="btn" id="btn-resume">Resume</button><button class="btn alt" id="btn-quit">Leave match</button></div>
+        <div class="row" style="align-items:stretch">
+          <div class="panel">${settingsHTML('p')}</div>
+          <div class="panel"><div class="label">Controls</div>${KEYS}</div>
+        </div>
       </div>
     </div>
 

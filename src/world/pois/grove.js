@@ -77,7 +77,7 @@ export function buildGrove(world) {
       if (!keep(x, z)) continue;
       world.props.addInstance('orange', x, z, 0.85 + rng() * 0.3, rng() * 6.28);
       trees++;
-      if (rng() < 0.42) b.floorLoot(x + (rng() - 0.5) * 3, b.h(x, z), z + (rng() - 0.5) * 3, false, 'floorange');
+      if (rng() < 0.16) b.floorLoot(x + (rng() - 0.5) * 3, b.h(x, z), z + (rng() - 0.5) * 3, false, 'floorange');
     }
   }
   b.chest(cx - 60, b.h(cx - 60, cz - 60), cz - 60, 0.3);

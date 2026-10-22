@@ -103,6 +103,24 @@ const results = await page.evaluate(async () => {
   p.shield = 60; give('small_shield', 0, 3); p.equip(3); p.equipT = 0; p.input.firePressed = true; step(0.2);
   ok('mini shield: refuses above 50', p.using === null, p.shield);
 
+  // ---- every consumable ----
+  const useItem = (id, secs, hp = 100, sh = 0) => { toGround(plaza.x + 30, plaza.z + 20); p.hp = hp; p.shield = sh; give(id, 1, 3); p.equip(3); p.equipT = 0; p.input.firePressed = true; step(secs); };
+  useItem('apple', 1.5, 50); ok('apple +5 hp', Math.abs(p.hp - 55) < 0.5, p.hp);
+  useItem('banana', 1.5, 50); ok('banana +5 hp', Math.abs(p.hp - 55) < 0.5, p.hp);
+  useItem('mushroom', 1.5); ok('shield mushroom +5 shield', p.shield === 5, p.shield);
+  useItem('chug_jug', 13, 30); ok('chug jug restores hp+shield', p.hp === 100 && p.shield === 100, `${p.hp}/${p.shield}`);
+  useItem('slurp', 2, 60); const h1 = p.hp; step(8); ok('slurp juice heals over time', p.hp > h1 + 5 && p.shield > 3, `${h1}->${p.hp.toFixed(0)} sh ${p.shield.toFixed(0)}`);
+  step(10);
+  p.buffs.speedT = 0; useItem('jumpple', 1.5); ok('jumpple grants speed+jump buff', p.buffs.speedT > 20 && p.buffs.jumpT > 20, p.buffs.speedT.toFixed(1));
+  p.buffs.speedT = p.buffs.jumpT = 0;
+
+  // boogie bomb makes the target dance
+  toGround(plaza.x - 20, plaza.z + 36);
+  const dd = dummy(plaza.x - 20 + 8, plaza.z + 36, 1000);
+  give('boogie', 1, 1); p.inv.slots[1].count = 2; p.yaw = -Math.PI / 2; aimAt(dd, 0.3);
+  p.input.firePressed = true; step(0.4); p.input.firePressed = false; step(2.5);
+  ok('boogie bomb forces a dance', dd.danceT > 0, dd.danceT.toFixed(1));
+
   // ---- chests & pickups ----
   const chest = g.loot.chests.find((c) => !c.elevated && Math.hypot(c.x - plaza.x, c.z - plaza.z) < 60);
   toGround(chest.x + 1.2, chest.z);

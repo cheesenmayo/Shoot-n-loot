@@ -190,6 +190,9 @@ export class World {
     this.terrain.update(camera.position);
     this.props.update(camera.position, dt, time);
     this.sky.update(camera, focus, dt, time);
+    // see further when you are high up (bus, skydive, glider)
+    const alt = Math.max(0, camera.position.y - this.terrain.height(camera.position.x, camera.position.z));
+    if (this.graphics) this.sky.setFog(this.graphics.viewDistance * 0.35 + alt * 1.2, this.graphics.viewDistance + alt * 3.5);
     const w = this.water.userData.water;
     this.water.position.x = Math.round(camera.position.x / 100) * 100;
     this.water.position.z = Math.round(camera.position.z / 100) * 100;
@@ -205,7 +208,7 @@ export class World {
     r.setPixelRatio(g.pixelRatio);
     this.sky.setShadowQuality(g.shadowMap, g.shadowExtent);
     r.shadowMap.enabled = g.shadowMap > 0;
-    r.shadowMap.type = g.shadowMap >= 4096 ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
+    r.shadowMap.type = THREE.PCFShadowMap;
     this.sky.setFog(g.viewDistance * 0.35, g.viewDistance);
     this.sky.setCloudsVisible(g.clouds);
     this.terrain.viewDistance = g.viewDistance;

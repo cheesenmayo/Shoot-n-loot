@@ -5,7 +5,7 @@ export const POIS = [
   {
     id: 'parkour_plaza', name: 'Parkour Plaza', x: 0, z: -40, y: 'auto',
     flatR: 105, blendR: 200, clearR: 120, color: '#38d6ff',
-    chests: 9, floorLoot: 34, bias: { parkour: 2.6, floorange: 2 }, rough: 0,
+    chests: 9, floorLoot: 34, bias: { parkour: 1.8, floorange: 1.5 }, rough: 0,
   },
   {
     id: 'distant_desert', name: 'Distant Desert', x: -540, z: 420, y: 6,

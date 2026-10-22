@@ -157,6 +157,7 @@ export class Game {
     this.clearMatch();
     this.paused = false;
     this.pendingResult = null;
+    this.resultShown = false;
     clearTimeout(this.resultTimer);
     this.hud.show('title', false);
     this.hud.show('result', false);
@@ -209,29 +210,41 @@ export class Game {
     this.state = 'menu';
     this.audio.setWind(0);
     this.audio.setStorm(0);
-    try { document.exitPointerLock(); } catch { /* ignore */ }
+    this.resultShown = false;
+    this.releaseLock();
   }
 
   togglePause() {
     if (this.state === 'menu' || this.state === 'loading') return;
+    // Esc both drops pointer lock and (in some browsers) fires a keydown: ignore the echo
+    if (performance.now() - (this.pauseChangedAt || 0) < 250) return;
     if (this.paused) this.resume(); else this.pause();
+  }
+  releaseLock() {
+    this.lockReleasing = true;
+    try { document.exitPointerLock(); } catch { /* ignore */ }
+    setTimeout(() => { this.lockReleasing = false; }, 400);
   }
   pause() {
     if (this.paused || !['bus', 'playing', 'dead', 'ended'].includes(this.state)) return;
+    this.pauseChangedAt = performance.now();
     this.paused = true;
     this.hud.show('pause', true);
     this.audio.setWind(0);
-    try { document.exitPointerLock(); } catch { /* ignore */ }
+    this.releaseLock();
   }
   resume() {
+    this.pauseChangedAt = performance.now();
     this.paused = false;
     this.hud.show('pause', false);
     this.controller.requestLock();
   }
   onLockLost() {
+    if (this.lockReleasing || this.resultShown) return;
     if (['bus', 'playing', 'dead'].includes(this.state) && !this.paused && !this.hud.mapOpen) this.pause();
   }
   spectate() {
+    this.resultShown = false;
     this.state = 'dead';
     this.hud.toast('Spectating · E / Q to switch player');
     this.controller.requestLock();
@@ -298,8 +311,8 @@ export class Game {
       this.controller.spectate.target = killer && killer.alive ? killer : null;
       this.pendingResult = { win: false, placement, kills: victim.kills, damage: victim.stats.damage, time: this.time - this.matchStartT, killer: killer?.name || (info.type === 'storm' ? 'the storm' : info.type === 'fall' ? 'a fall' : null), total: this.chars.length };
       this.resultTimer = setTimeout(() => {
-        if (this.pendingResult && this.state === 'dead') this.hud.showResult(this.pendingResult);
-        try { document.exitPointerLock(); } catch { /* ignore */ }
+        if (this.pendingResult && this.state === 'dead') { this.resultShown = true; this.hud.showResult(this.pendingResult); }
+        this.releaseLock();
       }, 2200);
     }
     if (this.aliveCount <= 1) this.endMatch();
@@ -313,8 +326,9 @@ export class Game {
       this.audio.play('win', null);
       this.hud.feed('<b>VICTORY ROYALE!</b>', 'me');
       this.resultTimer = setTimeout(() => {
+        this.resultShown = true;
         this.hud.showResult({ win: true, placement: 1, kills: winner.kills, damage: winner.stats.damage, time: this.time - this.matchStartT, total: this.chars.length });
-        try { document.exitPointerLock(); } catch { /* ignore */ }
+        this.releaseLock();
       }, 2500);
     } else {
       this.hud.toast(`${winner ? winner.name : 'Nobody'} wins the match`);

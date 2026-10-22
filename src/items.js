@@ -152,7 +152,7 @@ export function rollLoot({ bias = {}, focus = null, rarityBias = 0, forceGroup =
   }
   const groups = forceGroup ? [[forceGroup, 1]] : Object.entries(CAT_WEIGHTS).map(([g, w]) => {
     let ww = w;
-    if (focus === 'parkour' && (g === 'gadget' || g === 'throw')) ww *= 3.5;
+    if (focus === 'parkour' && (g === 'gadget' || g === 'throw')) ww *= 1.8;
     if (focus === 'west' && g === 'weapon') ww *= 1.3;
     return [g, ww];
   });
@@ -166,7 +166,7 @@ export function rollLoot({ bias = {}, focus = null, rarityBias = 0, forceGroup =
     let w = def.weight;
     for (const tag of def.tags) {
       if (bias[tag]) w *= bias[tag];
-      if (focus && focus === tag) w *= 4;
+      if (focus && focus === tag) w *= 2;
     }
     return [def, w];
   });
@@ -188,7 +188,7 @@ export function rollChest(bias = {}, focus = null, rng = Math.random) {
   out.push(rollLoot({ bias, focus, forceGroup: 'heal', rng }));
   if (rng() < 0.7) out.push(rollLoot({ bias, focus, forceGroup: 'heal', rng }));
   if (rng() < 0.55) out.push(rollLoot({ bias, focus, forceGroup: rng() < 0.7 ? 'throw' : 'gadget', rng }));
-  if (focus === 'parkour' && rng() < 0.6) {
+  if (focus === 'parkour' && rng() < 0.3) {
     const id = rng() < 0.5 ? 'jumpple' : 'grappler';
     out.push({ id, rarity: 0, count: id === 'jumpple' ? 2 : ITEMS.grappler.charges });
   }
