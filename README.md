@@ -34,7 +34,7 @@ the game asks you to rotate and pauses while you hold the device upright. Phones
 | **PICK UP / OPEN** | appears next to loot and chests (hold it to open a chest) |
 | hotbar | tap a slot to switch items |
 | ⏸ / pin | pause menu / map |
-| ⚗ (flask, Sandbox only) | open the sandbox tools |
+| 🧪 (flask, Sandbox only) | open the sandbox tools |
 
 Aim assist (on by default, optional in settings) gently pulls shots and the camera toward an enemy near the crosshair.
 

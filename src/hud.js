@@ -30,7 +30,7 @@ const TOUCHHELP = `
     <div><b>FIRE</b> hold to shoot · drag to aim</div><div><b>◎</b> aim down sights</div>
     <div><b>JUMP</b> jump · drop from the bus · glider</div><div><b>▼</b> crouch · <b>↻</b> reload</div>
     <div><b>PICK UP / OPEN</b> appears next to loot</div><div><b>Hotbar</b> tap to switch items</div>
-    <div><b>⏸</b> pause · <b>📍</b> map</div><div><b>⚗</b> sandbox tools (Sandbox mode)</div>
+    <div><b>⏸</b> pause · <b>📍</b> map</div><div><b>🧪</b> sandbox tools (Sandbox mode)</div>
   </div>`;
 
 const KEYS = `

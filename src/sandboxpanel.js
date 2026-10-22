@@ -25,6 +25,8 @@ export class SandboxPanel {
     const el = document.createElement('div');
     el.id = 'sbx';
     el.className = 'sbx';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-label', 'Sandbox tools');
     el.innerHTML = this.template();
     root.appendChild(el);
     this.el = el;
@@ -127,6 +129,7 @@ export class SandboxPanel {
       }
       b.blur();
     });
+    addEventListener('resize', () => { if (sbx.open) this.insetHud(true); });
     this.$('.sbx-sel').addEventListener('change', (e) => { g.audio.play('click'); sbx.setCfg('weapon', e.target.value); e.target.blur(); });
   }
 
@@ -170,8 +173,8 @@ export class SandboxPanel {
   /** Reflect the sandbox state (options, toggles, counts) in the controls. */
   sync() {
     const sbx = this.sbx, c = sbx.cfg;
-    const set = (sel, v) => this.$$(sel).forEach((el) => el.classList.toggle('on', el.dataset.val === String(v)));
-    this.$$('.sbx-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.id === c.tab));
+    const set = (sel, v) => this.$$(sel).forEach((el) => { const on = el.dataset.val === String(v); el.classList.toggle('on', on); el.setAttribute('aria-pressed', String(on)); });
+    this.$$('.sbx-tabs button').forEach((b) => { b.classList.toggle('on', b.dataset.id === c.tab); b.setAttribute('aria-pressed', String(b.dataset.id === c.tab)); });
     this.$$('[data-pane]').forEach((s) => { s.hidden = s.dataset.pane !== c.tab; });
     set('[data-opt=rarity] button', c.rarity);
     for (const k of ['skill', 'count', 'place', 'health', 'behaviour']) set(`[data-opt=${k}] button`, c[k]);

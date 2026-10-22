@@ -12,7 +12,10 @@ const ARGS = ['--autoplay-policy=no-user-gesture-required', '--use-gl=angle', '-
 const results = [];
 const errors = [];
 const perf = {};
-const ok = (name, cond, info = '') => results.push({ name, pass: !!cond, info: String(info) });
+const ok = (name, cond, info = '') => {
+  results.push({ name, pass: !!cond, info: String(info) });
+  console.log(`${cond ? '  ok ' : 'FAIL '} ${name}${info ? '  — ' + info : ''}`);
+};
 
 async function load(browser, opts, label) {
   const ctx = await browser.newContext(opts);
@@ -262,7 +265,7 @@ async function scenario(page, touch, cdp) {
     });
     await step(0.1);
   }
-  await E(() => { window.__game.controller.mouseDown = false; });
+  await E(() => { window.__game.controller.mouseDown = false; window.__game.controller.pitch = -0.08; });
   const hit = await E(() => { const g = window.__game, s = g.sbx.stats, d = window.__t.enemies()[0]; return { total: s.total, hits: s.hits, dps: g.sbx.dps(), hp: d.hp, last: s.last && s.last.v, txt: document.querySelector('#sbx-stats').textContent, target: document.querySelector('#sbx-target').classList.contains('hidden') }; });
   t('real shots register in the damage readout (total, DPS, last hit)', hit.hits >= 3 && hit.total > 50 && hit.dps > 20 && hit.last > 0 && /DMG\s*\d/.test(hit.txt) && !hit.target, JSON.stringify(hit));
   await E(() => { const g = window.__game; window.__t.enemies()[0].takeDamage(40, g.player, { headshot: true, weapon: g.player.stack.def }); });
@@ -601,10 +604,10 @@ async function leakCycles(page, touch) {
     await E(() => { const g = window.__game; for (const e of window.__t.enemies().slice(0, 4)) e.takeDamage(9999, g.player, { weapon: g.player.stack.def }); g.sbx.spawn(); });
     await step(8);
     await E(() => window.__game.sbx.openPanel());
-    await wait(200);
+    await wait(450); // Esc right after a pause / panel change is ignored on purpose (it echoes the lock release)
     await page.keyboard.press('Escape');
     await step(0.1);
-    await wait(300);
+    await wait(450);
     await page.keyboard.press('Escape');
     await step(0.1);
     await press('#btn-quit');
@@ -617,6 +620,9 @@ async function leakCycles(page, touch) {
   // a normal match afterwards
   await press('#btn-play');
   await step(2);
+  const tm = Date.now();
+  await step(3);
+  perf.match = (Date.now() - tm) / 90;
   const m = await E(() => { const g = window.__game; return { sandbox: g.sandbox, state: g.state, bus: g.bus.active, storm: g.storm.active, chars: g.chars.length, alive: g.aliveCount, quit: document.querySelector('#btn-quit').textContent, read: document.querySelector('#sbx-read').classList.contains('hidden'), body: document.body.classList.contains('sandbox'), sbx: g.sbx.enemies.length, ic: document.querySelector('#alive-ic').textContent, b: document.querySelector('#btn-sbx').classList.contains('hidden'), sod: g.player.takeDamage === window.__game.chars[0].constructor.prototype.takeDamage, mem: window.__t.mem() }; });
   t('Play after the sandbox starts a normal match (bus, storm, 50 players)', !m.sandbox && m.state === 'bus' && m.bus && m.storm && m.chars === 50 && m.alive === 50, JSON.stringify(m));
   t('sandbox HUD bits are gone and cheats are not inherited', m.quit === 'Leave match' && m.read && !m.body && m.sbx === 0 && m.ic === '👥' && m.b && m.sod);
@@ -630,36 +636,39 @@ async function leakCycles(page, touch) {
 }
 
 const browser = await pw.chromium.launch({ args: ARGS });
+const guard = async (label, fn) => {
+  try { await fn(); } catch (e) { ok(`${label}: test run aborted`, false, `${e.message.split('\n')[0]}`); }
+};
 try {
   if (ONLY !== 'touch') {
     const { ctx, page } = await load(browser, { viewport: { width: 1280, height: 720 } }, 'desktop');
-    await scenario(page, false, null);
-    await leakCycles(page, false);
-    // persisted choices survive a reload
-    await page.reload();
-    await page.waitForFunction('window.__ready === true', null, { timeout: 240000 });
-    const cfg = await page.evaluate(() => window.__game.sbx.cfg);
-    ok('desktop: panel choices are restored after a reload', cfg.count === 10 && cfg.place === 'f40' && cfg.skill === 'pro' && cfg.rarity === 1 && cfg.tab === 'enemies', JSON.stringify(cfg));
+    await guard('desktop', async () => {
+      await scenario(page, false, null);
+      await leakCycles(page, false);
+      // persisted choices survive a reload
+      await page.reload();
+      await page.waitForFunction('window.__ready === true', null, { timeout: 240000 });
+      const cfg = await page.evaluate(() => window.__game.sbx.cfg);
+      ok('desktop: panel choices are restored after a reload', cfg.count === 10 && cfg.place === 'f40' && cfg.skill === 'pro' && cfg.rarity === 1 && cfg.tab === 'enemies', JSON.stringify(cfg));
+    });
     await ctx.close();
   }
   if (ONLY !== 'desktop') {
     const { ctx, page } = await load(browser, { ...pw.devices['Pixel 7 landscape'] }, 'touch');
     const cdp = await ctx.newCDPSession(page);
     ok('touch: touch mode auto-detected', await page.evaluate(() => window.__game.touchMode));
-    await scenario(page, true, cdp);
-    await leakCycles(page, true);
+    await guard('touch', async () => {
+      await scenario(page, true, cdp);
+      await leakCycles(page, true);
+    });
     await ctx.close();
   }
 } finally {
   await browser.close();
 }
 
-let failed = 0;
-for (const r of results) {
-  if (!r.pass) failed++;
-  console.log(`${r.pass ? '  ok ' : 'FAIL '} ${r.name}${r.info ? '  — ' + r.info : ''}`);
-}
-if (perf.step40 !== undefined) console.log(`\nperf (game.step only, SwiftShader host): ${perf.step0.toFixed(2)} ms/step with no enemies, ${perf.step40.toFixed(2)} ms/step with 40 enemies`);
+const failed = results.filter((r) => !r.pass).length;
+if (perf.step40 !== undefined) console.log(`\nperf (game.step only, headless SwiftShader host, last pass): sandbox ${perf.step0.toFixed(2)} ms/step with no enemies, ${perf.step40.toFixed(2)} ms/step with 40 hostile enemies, normal match with 49 bots ${perf.match.toFixed(2)} ms/step`);
 console.log(errors.length ? `\nconsole errors/warnings (${errors.length}):\n` + errors.slice(0, 10).join('\n') : '\nno console errors');
 console.log(`\n${results.length - failed}/${results.length} checks passed`);
 process.exit(failed || errors.length ? 1 : 0);

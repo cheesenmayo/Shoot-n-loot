@@ -477,7 +477,7 @@ export class Sandbox {
       if (spot) spots.push(spot);
     }
     const names = this.names(spots.length);
-    spots.forEach((s, i) => this.addEnemy(s, o, names[i]));
+    spots.forEach((s, i) => { this.addEnemy(s, o, names[i]); if (i < 12) g.fx.teleport(s, 'cyan'); }); // a puff of light where they pop in
     const trimmed = o.count > room;
     if (!spots.length) g.hud.toast('No room to spawn here');
     else g.hud.toast(`Spawned ${spots.length} enem${spots.length === 1 ? 'y' : 'ies'}${trimmed ? ` · limit is ${ENEMY_CAP}` : ''}`);
