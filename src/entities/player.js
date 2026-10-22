@@ -335,8 +335,9 @@ export class PlayerController {
       cam.position.copy(_v).addScaledVector(_f, 0.25);
       ch.root.visible = false;
     } else if (fp) {
+      // a little behind the eyes (the head is hidden) so the hands and the weapon sit inside the view
       ch.eyePos(_v);
-      cam.position.copy(_v).addScaledVector(_f, 0.18);
+      cam.position.set(_v.x + Math.sin(this.yaw) * 0.15, _v.y, _v.z + Math.cos(this.yaw) * 0.15);
       ch.root.visible = true;
     } else {
       const want = _v.copy(pivot).addScaledVector(_r, offset).addScaledVector(_f, -dist);

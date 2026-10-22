@@ -1,6 +1,6 @@
 // Contact-sheet renderer for the character animation system.
 //   node tools/anim-preview.mjs <sheet> [--views=tps,side,front] [--cols=6] [--tile=300x360] [--only=text] [--out=name]
-// Sheets: models, heads, quick, loco, guns, allguns, reload, melee, items, hits, death, air, all. Output: tools/shots/anim-<name>.png (look at it with an image viewer).
+// Sheets: models, heads, fpv, quick, loco, guns, allguns, reload, melee, items, hits, death, air, all. Output: tools/shots/anim-<name>.png (look at it with an image viewer).
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
@@ -95,6 +95,31 @@ const SHEETS = {
         S.snap('#' + i + ' ' + c.skill, c);
         S.reset(c, { x: S.x + 40 + i * 2.5, z: S.z + 40 }); // out of the way for the next one
       }
+    } },
+  ],
+  fpv: [
+    ...['ar', 'pistol', 'bolt_sniper', 'rocket_launcher'].map((id) => ({ arg: id, title: `first person: ${id} (ready, aim, ADS, recoil, reload, sprint)`, views: ['fpv'], run: async (S, id) => {
+      const g = window.__game;
+      S.reset(); const p = S.player(); p.model.head.visible = false; const st = S.give(id, 2, 1, 999);
+      S.step(0.6); S.snap('ready');
+      p.lastShotT = g.time; S.step(0.5); S.snap('aim');
+      p.input.ads = true; S.step(0.5); S.snap('ADS');
+      p.flashT = 0.05; p.anim.event('shoot', st.def.recoil); S.step(0.02); S.snap('flash'); S.step(0.08); S.snap('+0.1');
+      p.input.ads = false; p.lastShotT = -99; S.step(0.4);
+      st.mag = 0; p.startReload(); const dur = p.reload.dur; let last = 0;
+      for (const f of [0.2, 0.4, 0.6]) { S.step(Math.max(0, f * dur - last)); last = f * dur; S.snap('reload ' + f.toFixed(1)); }
+      S.step(dur); p.input.fwd = 1; p.input.sprint = true; S.step(0.8); S.snap('sprint'); S.stop();
+    } })),
+    { title: 'first person: melee and consumables', views: ['fpv'], run: async (S) => {
+      const p = S.player(); S.reset(); p.model.head.visible = false; S.hold('pickaxe'); S.step(0.5); S.snap('pickaxe rest');
+      p.input.fire = true; S.step(1 / 60); p.input.fire = false;
+      let t = 1 / 60; const dur = p.swingDur;
+      for (const f of [0.2, 0.35, 0.5, 0.7]) { S.step(Math.max(0, f * dur - t)); t = f * dur; S.snap('swing ' + f.toFixed(2)); }
+      S.step(1); S.reset(); p.model.head.visible = false;
+      const st = S.give('apple', 1, 1, 1); p.hp = 40; S.step(0.1);
+      p.using = { stack: st, t: 0, dur: st.def.time, def: st.def };
+      let last = 0;
+      for (const k of [0.15, 0.4, 0.6, 0.85]) { S.step(Math.max(1 / 60, k * st.def.time - last)); last = k * st.def.time; if (p.using) S.snap('apple ' + k.toFixed(2)); }
     } },
   ],
   heads: [

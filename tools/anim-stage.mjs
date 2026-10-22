@@ -147,7 +147,14 @@ export function stageInit() {
     const rx = cy, rz = -sy;
     let px = c.pos.x, py = c.pos.y, pz = c.pos.z;
     const crouch = c.crouching ? 1.2 : 1.6;
-    if (view === 'tps' || view === 'far') {
+    c.model.head.visible = view !== 'fpv'; // the game hides the head (hair, hat) in first person
+    if (view === 'fpv') {
+      // the game's first-person camera: at the eye height, a little behind the eyes (see player.js)
+      c.eyePos(cam.position);
+      cam.position.x += sy * 0.15; cam.position.z += cy * 0.15;
+      cam.fov = c.ads && c.stack?.def.kind === 'gun' ? 70 / c.stack.def.zoom : 70;
+      cam.lookAt(cam.position.x + fx * 50, cam.position.y + fy * 50, cam.position.z + fz * 50);
+    } else if (view === 'tps' || view === 'far') {
       let dist = view === 'tps' ? 2.1 : 4.6, off = view === 'tps' ? 0.6 : 0.9, fov = 70;
       const st = c.stack;
       if (view === 'tps' && c.ads && st?.def.kind === 'gun') { dist = 1.0; off = 0.34; fov = 70 * st.def.zoom; }
