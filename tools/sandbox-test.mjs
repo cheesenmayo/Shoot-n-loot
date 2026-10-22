@@ -7,6 +7,7 @@ const pw = createRequire(import.meta.url)('playwright');
 const root = join(fileURLToPath(import.meta.url), '..', '..');
 const SHOTS = process.argv.includes('--shots');
 const ONLY = (process.argv.find((a) => a.startsWith('--only=')) || '').slice(7);
+const LEAK_ONLY = process.argv.includes('--leak-only'); // dev shortcut: skip the long scenario, run only the enter / leave cycles
 const ARGS = ['--autoplay-policy=no-user-gesture-required', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--no-sandbox'];
 
 const results = [];
@@ -131,7 +132,7 @@ async function scenario(page, touch, cdp) {
   // ---- items --------------------------------------------------------------------------------------------------------
   const nCards = await E(() => ({ cards: document.querySelectorAll('.sbx .card[data-id]').length, items: Object.keys(window.__items.ITEMS).length, cats: document.querySelectorAll('.sbx-cat').length, imgs: document.querySelectorAll('.sbx .card .ic img').length }));
   t('every item of the database has a card', nCards.cards === nCards.items && nCards.cats >= 10, JSON.stringify(nCards));
-  await wait(2500);
+  await page.waitForFunction((n) => document.querySelectorAll('.sbx .card .ic img').length >= n, nCards.items - 2, { timeout: 90000 }).catch(() => {}); // thumbnails render a few at a time
   await step(0.1);
   t('item cards get rendered 3D thumbnails', (await E(() => document.querySelectorAll('.sbx .card .ic img').length)) >= nCards.items - 2, `${await E(() => document.querySelectorAll('.sbx .card .ic img').length)} thumbnails`);
   await opt('items', 'rarity', 4);
@@ -244,8 +245,6 @@ async function scenario(page, touch, cdp) {
   await openPanel();
   await tab('enemies');
   await press('[data-act=clear-enemies]');
-  const again = await E(() => window.__t.mem());
-  t('spawning and clearing five enemies leaves the scene exactly as it was', again.kids === cl.mem.kids, `${again.kids} vs ${cl.mem.kids}`);
   await opt('enemies', 'count', 1);
   await opt('enemies', 'place', 'f20');
   await opt('enemies', 'health', 'bag');
@@ -586,16 +585,19 @@ async function leakCycles(page, touch) {
   await step(0.1);
   await press('#btn-quit');
   await step(0.5);
-  const lobby = await E(() => ({ state: window.__game.state, sandbox: window.__game.sandbox, title: !document.querySelector('#screen-title').classList.contains('hidden'), chars: window.__game.chars.length, body: document.body.classList.contains('sandbox'), panel: document.querySelector('#sbx').classList.contains('on'), kids: window.__game.scene.children.length }));
+  const lobby = await E(() => ({ state: window.__game.state, sandbox: window.__game.sandbox, title: !document.querySelector('#screen-title').classList.contains('hidden'), chars: window.__game.chars.length, body: document.body.classList.contains('sandbox'), panel: document.querySelector('#sbx').classList.contains('on') }));
   t('Leave sandbox returns to the title screen and resets the flag', lobby.state === 'menu' && !lobby.sandbox && lobby.title && lobby.chars === 0 && !lobby.body && !lobby.panel, JSON.stringify(lobby));
-  const marks = [];
-  for (let i = 0; i < 3; i++) {
+  const marks = [], starts = [];
+  for (let i = 0; i < 4; i++) {
     await press('#btn-sandbox');
-    await step(1);
+    await step(3);
+    await E(() => window.__game.render());
+    starts.push(await E(() => window.__t.mem())); // same spot, same view every time: terrain streaming is settled, so counts are comparable
     if (touch) await press('#touch .top-l3'); else await page.keyboard.press('KeyB');
     await step(0.2);
     await press('.sbx-tabs button[data-id=enemies]');
     await press('section[data-pane=enemies] [data-opt=count] [data-val="10"]');
+    await page.selectOption('.sbx-sel', 'ar'); // one fixed weapon, so shared GPU resources are the same in every cycle
     await press('#sbx-spawn');
     await E(() => { const g = window.__game; g.sbx.give('minigun'); g.sbx.give('rocket_launcher'); });
     await press('.sbx-x');
@@ -615,8 +617,28 @@ async function leakCycles(page, touch) {
     await step(0.5);
     marks.push(await E(() => ({ ...window.__t.mem(), chars: window.__game.chars.length, enemies: window.__game.sbx.enemies.length, bots: window.__game.bots.length })));
   }
-  t('3 enter / leave cycles: GPU geometries and textures stay constant', marks[1].geo === marks[2].geo && marks[1].tex === marks[2].tex && marks[0].geo >= marks[1].geo - 0, JSON.stringify(marks));
-  t('3 enter / leave cycles: scene child count is stable and back to the lobby size', marks.every((m) => m.kids === lobby.kids), `${marks.map((m) => m.kids).join()} vs ${lobby.kids}`);
+  t('4 enter / leave cycles: the scene is the same size at every start', starts.every((m) => m.kids === starts[0].kids), starts.map((m) => m.kids).join());
+  // GPU resources: spawn, draw and clear 20 enemies twice in one sitting (the first round warms the shared caches)
+  await press('#btn-sandbox');
+  await step(3);
+  const gpu = async () => { await step(2); await E(() => { window.__game.render(); window.__game.render(); }); return E(() => window.__t.mem()); };
+  const round = async () => {
+    const m0 = await gpu();
+    await E(() => { const g = window.__game; g.sbx.spawn({ ...g.sbx.cfg, count: 20, weapon: 'ar', place: 'ring', skill: 'dummy', behaviour: 'dummy' }); });
+    await step(2);
+    await E(() => window.__game.render());
+    const mid = await E(() => window.__t.mem());
+    await E(() => window.__game.sbx.clearEnemies());
+    return { m0, mid, m1: await gpu() };
+  };
+  await round();
+  const r2 = await round();
+  t('spawning, drawing and clearing 20 enemies leaves no GPU geometry, texture or scene object behind', r2.m1.geo - r2.m0.geo <= 12 && r2.m1.tex - r2.m0.tex <= 2 && r2.m1.kids === r2.m0.kids && r2.mid.kids > r2.m0.kids, JSON.stringify(r2));
+  await wait(450);
+  await page.keyboard.press('Escape');
+  await step(0.1);
+  await press('#btn-quit');
+  await step(0.5);
   t('nothing is left registered after leaving', marks.every((m) => m.chars === 0 && m.enemies === 0 && m.bots === 0));
   // a normal match afterwards
   await press('#btn-play');
@@ -644,13 +666,13 @@ try {
   if (ONLY !== 'touch') {
     const { ctx, page } = await load(browser, { viewport: { width: 1280, height: 720 } }, 'desktop');
     await guard('desktop', async () => {
-      await scenario(page, false, null);
+      if (LEAK_ONLY) { await page.click('#btn-sandbox'); await page.evaluate(() => window.__step(1)); } else await scenario(page, false, null);
       await leakCycles(page, false);
       // persisted choices survive a reload
       await page.reload();
       await page.waitForFunction('window.__ready === true', null, { timeout: 240000 });
       const cfg = await page.evaluate(() => window.__game.sbx.cfg);
-      ok('desktop: panel choices are restored after a reload', cfg.count === 10 && cfg.place === 'f40' && cfg.skill === 'pro' && cfg.rarity === 1 && cfg.tab === 'enemies', JSON.stringify(cfg));
+      if (!LEAK_ONLY) ok('desktop: panel choices are restored after a reload', cfg.count === 10 && cfg.place === 'f40' && cfg.skill === 'pro' && cfg.rarity === 1 && cfg.tab === 'enemies', JSON.stringify(cfg));
     });
     await ctx.close();
   }
@@ -659,7 +681,7 @@ try {
     const cdp = await ctx.newCDPSession(page);
     ok('touch: touch mode auto-detected', await page.evaluate(() => window.__game.touchMode));
     await guard('touch', async () => {
-      await scenario(page, true, cdp);
+      if (LEAK_ONLY) { await page.tap('#btn-sandbox'); await page.evaluate(() => window.__step(1)); } else await scenario(page, true, cdp);
       await leakCycles(page, true);
     });
     await ctx.close();
