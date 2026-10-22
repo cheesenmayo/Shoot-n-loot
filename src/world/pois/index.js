@@ -8,7 +8,9 @@ import { buildYard } from './yard.js';
 import { buildCity } from './city.js';
 import { buildOutposts } from './outposts.js';
 
-export function buildAllPois(world, progress) {
+const tick = () => new Promise((r) => setTimeout(r, 0));
+
+export async function buildAllPois(world, progress) {
   const builders = [
     ['Parkour Plaza', buildParkourPlaza],
     ['Distant Desert', buildDesert],
@@ -20,9 +22,11 @@ export function buildAllPois(world, progress) {
     ['Neon Heights', buildCity],
     ['Outposts', buildOutposts],
   ];
-  builders.forEach(([label, fn], i) => {
+  for (let i = 0; i < builders.length; i++) {
+    const [label, fn] = builders[i];
     progress(label, i / builders.length);
+    await tick(); // let the browser repaint the loading bar between locations
     fn(world);
-  });
+  }
   progress('done', 1);
 }

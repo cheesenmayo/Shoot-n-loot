@@ -54,9 +54,9 @@ export class World {
 
     await step('Raising towns & landmarks', 0.35);
     this.props = new Props(this, this.textures);
-    buildAllPois(this, (label, f) => onProgress(label, 0.35 + f * 0.25));
+    await buildAllPois(this, (label, f) => onProgress(label, 0.35 + f * 0.25));
     await step('Planting forests', 0.62);
-    this.props.generate((f) => onProgress('Planting forests', 0.62 + f * 0.3));
+    await this.props.generate((f) => onProgress('Planting forests', 0.62 + f * 0.3));
     this.scene.add(this.props.group);
 
     await step('Finishing touches', 0.95);
@@ -66,8 +66,8 @@ export class World {
   }
 
   /** Paint the island map in the background (called after the title screen is up). */
-  async paintMap() {
-    this.minimapCanvas = await this.terrain.makeMapCanvas(1024, (ctx, px, k) => {
+  async paintMap(size = 1024) {
+    this.minimapCanvas = await this.terrain.makeMapCanvas(size, (ctx, px, k) => {
       for (const r of this.mapRects) {
         ctx.fillStyle = r.color;
         ctx.fillRect(px(r.x0), px(r.z0), Math.max(1, (r.x1 - r.x0) * k), Math.max(1, (r.z1 - r.z0) * k));

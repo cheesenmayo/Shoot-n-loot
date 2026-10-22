@@ -202,7 +202,7 @@ export class Props {
     (this._extra ||= []).push({ type, x, z, scale, yaw, y });
   }
 
-  generate(onProgress) {
+  async generate(onProgress) {
     const per = WORLD.size / PROP_CHUNK;
     const dummy = new THREE.Object3D();
     const env = { desert: 0, snow: 0, rock: 0, forest: 0, sand: 0 };
@@ -298,6 +298,7 @@ export class Props {
         this.chunks.push(chunk);
       }
       onProgress?.((cz + 1) / per);
+      await new Promise((r) => setTimeout(r, 0));
     }
   }
 

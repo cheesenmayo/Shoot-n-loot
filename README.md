@@ -17,6 +17,25 @@ npm start          # builds and serves on http://localhost:8080
 Click **PLAY**, then click inside the game to capture the mouse (Esc releases it and pauses).
 If your browser refuses pointer lock, move the mouse to look, or use the arrow keys.
 
+### On a phone or tablet
+
+Touch controls switch on automatically (or force them under *Touch controls* in the settings). Play in **landscape**;
+the game asks you to rotate and pauses while you hold the device upright. Phones start on **Low** graphics.
+
+| Touch | Action |
+|---|---|
+| left side, drag | floating joystick: move (push it all the way to sprint) |
+| right side, drag | look around |
+| **FIRE** (hold) | shoot / use the selected item. Drag while holding to aim |
+| ◎ | aim down sights (toggle; scopes zoom in) |
+| **JUMP** | jump, drop from the bus, open the glider |
+| ▼ / ↻ | crouch (toggle) / reload |
+| **PICK UP / OPEN** | appears next to loot and chests (hold it to open a chest) |
+| hotbar | tap a slot to switch items |
+| ⏸ / pin | pause menu / map |
+
+Aim assist (on by default, optional in settings) gently pulls shots and the camera toward an enemy near the crosshair.
+
 ## Controls
 
 | Key | Action | Key | Action |
@@ -107,7 +126,7 @@ dist/game.js               bundled output (committed so index.html works offline
 npm run build       # production bundle -> dist/game.js
 npm run watch       # rebuild on change (unminified + sourcemap)
 npm run bundle      # also writes dist/shoot-n-loot.html (everything inlined in one file)
-npm test            # headless Chromium: mechanics + input tests (needs `playwright`)
+npm test            # headless Chromium: mechanics, keyboard/mouse and phone touch tests (needs `playwright`)
 ```
 
 `node tools/probe.mjs '<js>' [name|page:name]` runs a snippet inside the loaded game and optionally saves a screenshot
@@ -115,4 +134,5 @@ to `tools/shots/` (handy for poking at the world without a GPU).
 
 The tests drive the real game in headless Chromium: chests, pickups, every weapon class, fall damage, Floorange, Jumpple,
 grapple, jump pads, storm damage, skydiving, bot navigation through multi‑storey buildings, keyboard/mouse input, pause menu
-and graphics presets.
+and graphics presets. `tools/mobile-test.mjs` emulates a phone and drives the touch controls with real multi‑touch events
+(`node tools/mobile-shots.mjs` saves HUD screenshots for several devices).

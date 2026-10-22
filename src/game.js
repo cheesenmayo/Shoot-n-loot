@@ -10,7 +10,8 @@ import { HUD } from './hud.js';
 import { Character } from './entities/character.js';
 import { PlayerController } from './entities/player.js';
 import { Bot, makeNames } from './entities/bot.js';
-import { PRESETS, settings, loadSettings, saveSettings } from './settings.js';
+import { PRESETS, settings, loadSettings, saveSettings, touchEnabled, coarsePointer } from './settings.js';
+import { TouchControls } from './touch.js';
 import { shuffle } from './util.js';
 import { WORLD } from './world/terrain.js';
 import { RARITIES } from './items.js';
@@ -20,7 +21,8 @@ const BOT_COUNT = 49;
 export class Game {
   constructor(canvas, uiRoot) {
     this.canvas = canvas;
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    // MSAA is too expensive for phones; the lower pixel ratio hides most aliasing anyway
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !coarsePointer(), powerPreference: 'high-performance' });
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.92;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -46,18 +48,54 @@ export class Game {
     this.fps = 60;
     this.pendingResult = null;
     this.forcedJump = false;
+    this.touchMode = false;
     this.hud = new HUD(this, uiRoot);
+    this.touch = new TouchControls(this, this.hud.$('#touch'));
     addEventListener('resize', () => this.onResize());
+    addEventListener('orientationchange', () => setTimeout(() => this.onResize(), 250));
   }
 
   onResize() {
     this.renderer.setSize(innerWidth, innerHeight);
     this.camera.aspect = innerWidth / innerHeight;
     this.camera.updateProjectionMatrix();
+    this.checkOrientation();
+  }
+
+  /** Phones play in landscape: ask for a rotation (and pause) while held upright. */
+  checkOrientation() {
+    const portrait = this.touchMode && innerHeight > innerWidth * 1.05;
+    this.hud.show('rotate', portrait);
+    if (portrait && ['bus', 'playing', 'dead'].includes(this.state)) this.pause();
+  }
+
+  /** Apply the touch-controls setting (auto / on / off). */
+  refreshTouch() {
+    const on = touchEnabled();
+    this.touchMode = on;
+    this.touch.setEnabled(on);
+    if (this.world && this.graphics) this.applyGraphics(settings.graphics);
+    this.checkOrientation();
+  }
+
+  enterFullscreen() {
+    try {
+      const el = document.documentElement;
+      const req = el.requestFullscreen || el.webkitRequestFullscreen;
+      if (req && !document.fullscreenElement && !document.webkitFullscreenElement) {
+        const p = req.call(el);
+        if (p && p.catch) p.catch(() => {});
+      }
+    } catch { /* not allowed here */ }
+    try {
+      const p = screen.orientation?.lock?.('landscape');
+      if (p && p.catch) p.catch(() => {});
+    } catch { /* ignore */ }
   }
 
   async init() {
     loadSettings();
+    this.refreshTouch();
     this.hud.syncSettings();
     this.renderer.setPixelRatio(1);
     this.renderer.setSize(innerWidth, innerHeight);
@@ -80,7 +118,7 @@ export class Game {
     this.hud.show('loading', false);
     this.hud.show('title', true);
     this.lastT = performance.now();
-    this.world.paintMap().then(() => { this.mapReady = true; });
+    this.world.paintMap(coarsePointer() ? 640 : 1024).then(() => { this.mapReady = true; });
   }
 
   applyGraphics(id, byUser = false) {
@@ -193,6 +231,7 @@ export class Game {
     this.matchStartT = this.time;
     this.state = 'bus';
     this.audio.init();
+    if (this.touchMode) this.enterFullscreen();
     this.audio.play('bus');
     this.hud.toast('The Battle Bus is on its way!');
     this.controller.requestLock();
@@ -230,6 +269,7 @@ export class Game {
     if (this.paused || !['bus', 'playing', 'dead', 'ended'].includes(this.state)) return;
     this.pauseChangedAt = performance.now();
     this.paused = true;
+    this.touch.setActive(false);
     this.hud.show('pause', true);
     this.audio.setWind(0);
     this.releaseLock();
@@ -241,13 +281,13 @@ export class Game {
     this.controller.requestLock();
   }
   onLockLost() {
-    if (this.lockReleasing || this.resultShown) return;
+    if (this.touchMode || this.lockReleasing || this.resultShown) return;
     if (['bus', 'playing', 'dead'].includes(this.state) && !this.paused && !this.hud.mapOpen) this.pause();
   }
   spectate() {
     this.resultShown = false;
     this.state = 'dead';
-    this.hud.toast('Spectating · E / Q to switch player');
+    this.hud.toast(this.touchMode ? 'Spectating · tap NEXT to switch player' : 'Spectating · E / Q to switch player');
     this.controller.requestLock();
   }
 
@@ -262,7 +302,7 @@ export class Game {
     if (ch.isPlayer) {
       this.state = 'playing';
       this.controller.yaw = ch.yaw;
-      this.hud.toast('W to dive · Space to open the glider');
+      this.hud.toast(this.touchMode ? 'Stick up to dive · tap GLIDE to open the glider' : 'W to dive · Space to open the glider');
       this.audio.play('glider', null, { vol: 0.4 });
     }
   }
@@ -379,6 +419,7 @@ export class Game {
 
   step(dt) {
     if (this.state === 'loading') return;
+    this.touch.setActive(this.touchMode && ['bus', 'playing', 'dead'].includes(this.state) && !this.paused && !this.resultShown && !this.hud.mapOpen);
     const inMatch = this.player && this.state !== 'menu';
     if (!inMatch) {
       this.time += dt;

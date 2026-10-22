@@ -8,9 +8,10 @@
     "build": "node tools/build.mjs",
     "watch": "node tools/build.mjs --watch",
     "start": "node tools/build.mjs && node tools/serve.mjs",
-    "test": "node tools/smoke-test.mjs && node tools/input-test.mjs",
+    "test": "node tools/smoke-test.mjs && node tools/input-test.mjs && node tools/mobile-test.mjs",
     "bundle": "node tools/build.mjs && node tools/bundle-single.mjs",
-    "test:input": "node tools/input-test.mjs"
+    "test:input": "node tools/input-test.mjs",
+    "test:mobile": "node tools/mobile-test.mjs"
   },
   "dependencies": {
     "three": "^0.186.1"

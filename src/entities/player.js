@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { settings } from '../settings.js';
+import { settings, saveSettings } from '../settings.js';
 import { clamp, damp, wrapAngle } from '../util.js';
 import { AMMO, RARITIES } from '../items.js';
 import { CHEST_OPEN_TIME } from '../loot.js';
@@ -73,6 +73,7 @@ export class PlayerController {
   }
 
   requestLock() {
+    if (this.game.touchMode) return; // fingers, not a mouse: nothing to lock
     const fail = () => {
       if (this.fallbackLook) return;
       this.fallbackLook = true;
@@ -104,18 +105,15 @@ export class PlayerController {
     if (!ch) return;
     if (code === 'KeyM' || code === 'Tab') { g.hud.toggleMap(); return; }
     if (code === 'KeyX') this.shoulder *= -1;
-    if (code === 'KeyV') { this.fpv = !this.fpv; g.hud.toast(this.fpv ? 'First person' : 'Third person'); }
+    if (code === 'KeyV') { settings.fpv = !settings.fpv; saveSettings(); g.hud.syncSettings(); g.hud.toast(settings.fpv ? 'First person' : 'Third person'); }
     if (code === 'F3') settings.showFps = !settings.showFps;
     if (!ch.alive) {
       if (code === 'KeyE' || code === 'ArrowRight' || code === 'KeyD') this.cycleSpectate(1);
       if (code === 'KeyQ' || code === 'ArrowLeft' || code === 'KeyA') this.cycleSpectate(-1);
       return;
     }
-    if (ch.mode === 'bus') {
-      if (code === 'Space') g.jumpFromBus(ch);
-      return;
-    }
-    if (code === 'Space') ch.input.jumpPressed = true;
+    if (code === 'Space') this.pressJump();
+    if (ch.mode === 'bus') return;
     if (ch.mode !== 'normal') return;
     if (code.startsWith('Digit')) {
       const n = parseInt(code.slice(5), 10);
@@ -125,6 +123,44 @@ export class PlayerController {
     if (code === 'KeyG') ch.dropSelected();
     if (code === 'KeyE') { this.interactHeld = true; this.tryInteract(true); }
     if (code === 'KeyQ') { ch.equip(ch.inv.lastSel); }
+  }
+
+  /** Space bar / jump button: leaves the bus, opens the glider, or jumps. */
+  pressJump() {
+    const ch = this.char, g = this.game;
+    if (!ch || !ch.alive || !g.inputEnabled()) return;
+    if (ch.mode === 'bus') g.jumpFromBus(ch);
+    else ch.input.jumpPressed = true;
+  }
+
+  equipSlot(i) {
+    const ch = this.char;
+    if (ch && ch.alive && ch.mode === 'normal' && this.game.inputEnabled()) ch.equip(i);
+  }
+
+  /** Touch aim assist: remember the enemy closest to the crosshair (bullets bend toward it a little). */
+  updateAssist() {
+    const ch = this.char, g = this.game;
+    ch.assistTarget = null;
+    this.assisting = false;
+    if (!g.touchMode || !settings.aimAssist || !ch.alive || ch.mode !== 'normal') return;
+    const cp = Math.cos(this.pitch);
+    const fx = -Math.sin(this.yaw) * cp, fy = Math.sin(this.pitch), fz = -Math.cos(this.yaw) * cp;
+    const ex = ch.pos.x, ey = ch.pos.y + ch.eyeHeight, ez = ch.pos.z;
+    let best = null, bestAng = 1;
+    for (const c of g.chars) {
+      if (c === ch || !c.alive || c.mode === 'bus') continue;
+      const dx = c.pos.x - ex, dy = c.pos.y + 1.15 - ey, dz = c.pos.z - ez;
+      const d = Math.hypot(dx, dy, dz);
+      if (d < 1.5 || d > 150) continue;
+      const ang = Math.acos(Math.min(1, (dx * fx + dy * fy + dz * fz) / d));
+      const tol = Math.atan2(1.1, d) + 0.035;
+      if (ang < tol && ang < bestAng) { bestAng = ang; best = c; }
+    }
+    if (best && g.world.collision.clearLine(ex, ey, ez, best.pos.x, best.pos.y + 1.15, best.pos.z)) {
+      ch.assistTarget = best;
+      this.assisting = true;
+    }
   }
 
   // ---- interaction ----------------------------------------------------------------------------------------------------------------------------
@@ -160,15 +196,32 @@ export class PlayerController {
     const enabled = g.inputEnabled();
     const k = this.keys;
     const dead = !ch.alive;
+    const T = g.touchMode && g.touch.active ? g.touch.state : null;
+
+    if (T) {
+      // look: finger drag (slower while aiming down sights or when the crosshair is on an enemy)
+      const [dx, dy] = g.touch.consumeLook();
+      if (dx || dy) {
+        const ads = ch.ads ? Math.max(0.35, this.fov / settings.fov) : 1;
+        const sens = 0.0052 * settings.sensitivity * ads * (this.assisting ? 0.65 : 1);
+        this.yaw -= dx * sens;
+        this.pitch = clamp(this.pitch - dy * sens * (settings.invertY ? -1 : 1), -1.45, 1.35);
+      }
+      if (T.jumpPressed) { T.jumpPressed = false; this.pressJump(); }
+      if (T.reloadPressed) { T.reloadPressed = false; if (ch.alive && ch.mode === 'normal') ch.startReload(); }
+      if (T.nextPressed) { T.nextPressed = false; this.cycleSpectate(1); }
+      if (T.firePressed) { T.firePressed = false; if (enabled && ch.alive) ch.input.firePressed = true; }
+      if (T.interactPressed) { T.interactPressed = false; if (enabled && ch.alive && ch.mode === 'normal') this.tryInteract(true); }
+    }
 
     if (enabled && !dead) {
-      inp.fwd = (k.has('KeyW') ? 1 : 0) - (k.has('KeyS') ? 1 : 0);
-      inp.strafe = (k.has('KeyD') ? 1 : 0) - (k.has('KeyA') ? 1 : 0);
-      inp.jump = k.has('Space');
-      inp.sprint = k.has('ShiftLeft') || k.has('ShiftRight');
-      inp.crouch = k.has('KeyC') || k.has('ControlLeft');
-      inp.fire = this.mouseDown;
-      inp.ads = this.rmbDown;
+      inp.fwd = clamp((k.has('KeyW') ? 1 : 0) - (k.has('KeyS') ? 1 : 0) - (T ? T.moveY : 0), -1, 1);
+      inp.strafe = clamp((k.has('KeyD') ? 1 : 0) - (k.has('KeyA') ? 1 : 0) + (T ? T.moveX : 0), -1, 1);
+      inp.jump = k.has('Space') || !!(T && T.jumpHeld);
+      inp.sprint = k.has('ShiftLeft') || k.has('ShiftRight') || !!(T && T.mag > 0.9 && T.moveY < -0.35);
+      inp.crouch = k.has('KeyC') || k.has('ControlLeft') || !!(T && T.crouch);
+      inp.fire = this.mouseDown || !!(T && T.fire);
+      inp.ads = this.rmbDown || !!(T && T.ads);
     } else if (!dead) {
       inp.fwd = inp.strafe = 0;
       inp.jump = inp.sprint = inp.crouch = inp.fire = inp.ads = false;
@@ -187,6 +240,7 @@ export class PlayerController {
       ch.yaw = this.yaw;
       ch.pitch = this.pitch;
     }
+    this.updateAssist();
 
     // recoil kick
     if (ch.recoil > this.lastRecoil + 0.001) {
@@ -200,7 +254,7 @@ export class PlayerController {
     if (!dead && ch.mode === 'normal' && enabled) {
       this.target = this.findTarget();
       const t = this.target;
-      if (t && t.type === 'chest' && this.keys.has('KeyE')) {
+      if (t && t.type === 'chest' && (this.keys.has('KeyE') || (T && T.interactHeld))) {
         const opened = g.loot.work(t.c, ch, dt);
         if (opened) this.target = null;
       }
@@ -214,6 +268,7 @@ export class PlayerController {
       }
     } else this.target = null;
     g.hud.setPrompt(this.target, this.char, this.target?.type === 'chest' ? (this.target.c.progress / CHEST_OPEN_TIME) : 0);
+    if (g.touchMode) g.touch.update(this);
 
     this.updateCamera(dt);
   }
@@ -264,7 +319,7 @@ export class PlayerController {
     _f.set(-Math.sin(this.yaw) * cp, sp, -Math.cos(this.yaw) * cp); // forward
     _r.set(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
 
-    const fp = this.fpv && ch.alive && ch.mode === 'normal';
+    const fp = settings.fpv && ch.alive && ch.mode === 'normal';
     if (ch.alive) ch.model.head.visible = !fp;
     if (this.scoped) {
       // first person through the scope

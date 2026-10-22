@@ -6,6 +6,7 @@ import { clamp } from './util.js';
 const R_BODY = 0.4;
 const _o = new THREE.Vector3(), _d = new THREE.Vector3(), _m = new THREE.Vector3(), _n = new THREE.Vector3(), _p = new THREE.Vector3();
 const hitInfo = {};
+const _assist = new THREE.Vector3();
 // shared projectile geometry (created once, reused for every shot)
 const ROCKET = {
   bodyGeo: new THREE.CylinderGeometry(0.06, 0.06, 0.5, 8).rotateX(Math.PI / 2),
@@ -90,7 +91,13 @@ export class Combat {
     const dmg = gunDamage(st);
     ch.lastShotT = g.time;
     const origin = ch.aimOrigin;
-    const base = ch.aimDir;
+    let base = ch.aimDir;
+    // touch aim assist: bend the shot toward the enemy nearest the crosshair
+    if (ch.isPlayer && ch.assistTarget && ch.assistTarget.alive) {
+      const t = ch.assistTarget;
+      _n.set(t.pos.x - origin.x, t.pos.y + 1.15 - origin.y, t.pos.z - origin.z).normalize();
+      base = _assist.copy(base).multiplyScalar(0.35).addScaledVector(_n, 0.65).normalize();
+    }
     const muzzle = ch.muzzlePos(_m);
     const spreadDeg = this.spreadFor(ch, def) + (ch.extraSpread || 0);
     const spreadRad = (spreadDeg * Math.PI) / 180;

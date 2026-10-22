@@ -11,15 +11,29 @@ const settingsHTML = (p) => `
     ${Object.values(PRESETS).map((g) => `<button data-g="${g.id}">${g.label}</button>`).join('')}
   </div>
   <div class="settings" style="margin-top:14px">
-    <span>Mouse sensitivity</span><input type="range" min="0.2" max="3" step="0.05" data-s="sensitivity"><span class="v" data-v="sensitivity"></span>
+    <span><span class="kb">Mouse</span><span class="tc">Look</span> sensitivity</span><input type="range" min="0.2" max="3" step="0.05" data-s="sensitivity"><span class="v" data-v="sensitivity"></span>
     <span>Field of view</span><input type="range" min="60" max="100" step="1" data-s="fov"><span class="v" data-v="fov"></span>
     <span>Volume</span><input type="range" min="0" max="1" step="0.05" data-s="volume"><span class="v" data-v="volume"></span>
+    <span>First person view</span><input type="checkbox" data-s="fpv"><span></span>
+    <span>Aim assist (touch)</span><input type="checkbox" data-s="aimAssist"><span></span>
     <span>Invert Y</span><input type="checkbox" data-s="invertY"><span></span>
     <span>Show FPS</span><input type="checkbox" data-s="showFps"><span></span>
+  </div>
+  <div class="label" style="margin-top:14px">Touch controls</div>
+  <div class="seg" data-seg="touch">
+    <button data-t="auto">Auto</button><button data-t="on">On</button><button data-t="off">Off</button>
+  </div>`;
+
+const TOUCHHELP = `
+  <div class="keys keys-touch">
+    <div><b>Left side</b> drag = move (push far to sprint)</div><div><b>Right side</b> drag = look</div>
+    <div><b>FIRE</b> hold to shoot · drag to aim</div><div><b>◎</b> aim down sights</div>
+    <div><b>JUMP</b> jump · drop from the bus · glider</div><div><b>▼</b> crouch · <b>↻</b> reload</div>
+    <div><b>PICK UP / OPEN</b> appears next to loot</div><div><b>Hotbar</b> tap to switch items</div>
   </div>`;
 
 const KEYS = `
-  <div class="keys">
+  <div class="keys keys-desktop">
     <div><b>W A S D</b> move</div><div><b>Shift</b> sprint</div>
     <div><b>Space</b> jump / open glider</div><div><b>C</b> crouch</div>
     <div><b>LMB</b> fire / use item</div><div><b>RMB</b> aim down sights</div>
@@ -46,12 +60,12 @@ export class HUD {
       <div class="title-wrap">
         <div class="logo">Shoot 'n' Loot<small>Battle Royale</small></div>
         <div class="tagline">50 PLAYERS · 8 LOCATIONS · 1 VICTORY ROYALE</div>
-        <div class="tagline" style="font-size:12px;opacity:.65">Best on a desktop browser with keyboard and mouse</div>
+        <div class="tagline" style="font-size:12px;opacity:.65"><span class="kb">Best on a desktop browser with keyboard and mouse</span><span class="tc">Touch controls are on · play in landscape</span></div>
         <div class="tagline" id="gfx-note" style="color:#7fe8ff"></div>
         <button class="btn" id="btn-play">Play</button>
         <div class="row" style="align-items:stretch">
           <div class="panel">${settingsHTML('t')}</div>
-          <div class="panel"><div class="label">Controls</div>${KEYS}</div>
+          <div class="panel"><div class="label">Controls</div>${KEYS}${TOUCHHELP}</div>
         </div>
       </div>
     </div>
@@ -62,7 +76,7 @@ export class HUD {
         <div class="row"><button class="btn" id="btn-resume">Resume</button><button class="btn alt" id="btn-quit">Leave match</button></div>
         <div class="row" style="align-items:stretch">
           <div class="panel">${settingsHTML('p')}</div>
-          <div class="panel"><div class="label">Controls</div>${KEYS}</div>
+          <div class="panel"><div class="label">Controls</div>${KEYS}${TOUCHHELP}</div>
         </div>
       </div>
     </div>
@@ -79,6 +93,11 @@ export class HUD {
         </div>
       </div>
     </div>
+
+    <div id="screen-rotate" class="screen hidden" style="z-index:60;background:#0b1020">
+      <div class="title-wrap"><div style="font-size:64px">📱</div><div class="logo" style="font-size:34px">Rotate your device</div><div class="tagline">Shoot 'n' Loot plays in landscape</div></div>
+    </div>
+    <div id="touch" class="hidden"></div>
 
     <div id="hud" class="hidden">
       <div class="vignette dmg" id="v-dmg"></div>
@@ -106,12 +125,12 @@ export class HUD {
       </div>
       <div class="hotbar" id="hotbar"></div>
       <div class="ammo" id="ammo"></div>
-      <div class="busui hidden" id="busui"><div class="big">PRESS SPACE TO JUMP</div><div class="sm">Soar over the island · look for a landing spot (M for map)</div></div>
+      <div class="busui hidden" id="busui"><div class="big"><span class="kb">PRESS SPACE TO JUMP</span><span class="tc">TAP JUMP TO DROP</span></div><div class="sm"><span class="kb">Soar over the island · look for a landing spot (M for map)</span><span class="tc">Soar over the island · pick a landing spot on the map</span></div></div>
       <div class="fps hidden" id="fps"></div>
       <div id="floaters"></div>
       <div id="dirs"></div>
     </div>
-    <div class="bigmap hidden" id="bigmap"><canvas id="bigmap-cv" width="1024" height="1024"></canvas><div class="hint">M or TAB to close</div></div>
+    <div class="bigmap hidden" id="bigmap"><canvas id="bigmap-cv" width="1024" height="1024"></canvas><div class="hint"><span class="kb">M or TAB to close</span><span class="tc">Tap to close</span></div></div>
     `;
     this.$ = (s) => root.querySelector(s);
     this.mm = this.$('#minimap').getContext('2d');
@@ -144,6 +163,25 @@ export class HUD {
         this.syncSettings();
       });
     });
+    root.querySelectorAll('[data-seg=touch]').forEach((seg) => {
+      seg.addEventListener('click', (e) => {
+        const b = e.target.closest('button[data-t]');
+        if (!b) return;
+        settings.touch = b.dataset.t;
+        saveSettings();
+        g.audio.play('click');
+        g.refreshTouch();
+        this.syncSettings();
+      });
+    });
+    // tap a hotbar slot to switch items
+    this.$('#hotbar').addEventListener('touchstart', (e) => {
+      const slot = e.target.closest('.slot');
+      if (!slot || slot.dataset.i === undefined) return;
+      if (e.cancelable) e.preventDefault();
+      g.controller.equipSlot(parseInt(slot.dataset.i, 10));
+    }, { passive: false });
+    this.$('#bigmap').addEventListener('click', () => { if (this.mapOpen) this.toggleMap(); });
     root.querySelectorAll('input[data-s]').forEach((inp) => {
       inp.addEventListener('input', () => {
         const k = inp.dataset.s;
@@ -166,6 +204,7 @@ export class HUD {
   syncSettings() {
     const root = this.root;
     root.querySelectorAll('[data-seg=graphics] button').forEach((b) => b.classList.toggle('on', b.dataset.g === settings.graphics));
+    root.querySelectorAll('[data-seg=touch] button').forEach((b) => b.classList.toggle('on', b.dataset.t === settings.touch));
     root.querySelectorAll('input[data-s]').forEach((inp) => {
       const k = inp.dataset.s;
       if (inp.type === 'checkbox') inp.checked = !!settings[k]; else inp.value = settings[k];
@@ -278,14 +317,15 @@ export class HUD {
     const el = this.$('#prompt');
     if (!target) { el.classList.add('hidden'); this.promptKey = ''; return; }
     let html;
+    const key = (k) => (this.game.touchMode ? '' : `<span class="pk">${k}</span>`);
     if (target.type === 'chest') {
-      html = `<span class="pk">E</span>Hold to open Chest<div class="pb"><div style="width:${Math.round(progress * 100)}%"></div></div>`;
+      html = `${key('E')}${this.game.touchMode ? 'Hold OPEN' : 'Hold to open'} Chest<div class="pb"><div style="width:${Math.round(progress * 100)}%"></div></div>`;
     } else {
       const d = target.d;
       const name = d.ammo ? `${AMMO[d.ammo].name} (${d.count})` : `${d.stack.def.name}${d.stack.count > 1 ? ' ×' + d.stack.count : ''}`;
       const col = d.ammo ? '#ddd' : RARITIES[d.stack.rarity].css;
       const full = !d.ammo && ch.inv.freeSlot() < 0 && !['consume', 'throw', 'gadget'].includes(d.stack.def.kind);
-      html = `<span class="pk">E</span>${full ? 'Swap' : 'Pick up'} <b style="color:${col}">${name}</b>${d.stack ? ` <span style="opacity:.7;font-size:13px">${RARITIES[d.stack.rarity].name}</span>` : ''}`;
+      html = `${key('E')}${full ? 'Swap' : 'Pick up'} <b style="color:${col}">${name}</b>${d.stack ? ` <span style="opacity:.7;font-size:13px">${RARITIES[d.stack.rarity].name}</span>` : ''}`;
     }
     if (html !== this.promptKey) { el.innerHTML = html; this.promptKey = html; }
     el.classList.remove('hidden');
@@ -333,6 +373,7 @@ export class HUD {
     this.$('#v-dmg').style.opacity = this.dmgA;
     this.$('#v-storm').style.opacity = ch.alive && ch.inStorm ? 0.55 + Math.sin(g.time * 4) * 0.15 : 0;
     this.$('#v-water').style.opacity = g.camera.position.y < 0 ? 1 : 0;
+    this.$('#cross').classList.toggle('assist', !!g.controller?.assisting);
     this.$('#scope').style.display = g.controller?.scoped ? 'block' : 'none';
 
     // bus / action prompts
@@ -401,9 +442,9 @@ export class HUD {
       this.lastHot = sig;
       let html = '';
       slots.forEach((s, i) => {
-        if (!s) { html += `<div class="slot empty"><span class="n">${i + 1}</span></div>`; return; }
+        if (!s) { html += `<div class="slot empty" data-i="${i}"><span class="n">${i + 1}</span></div>`; return; }
         const col = RARITIES[s.rarity].css;
-        html += `<div class="slot ${i === ch.inv.sel ? 'sel' : ''}"><span class="n">${i + 1}</span><span class="ic">${s.def.icon}</span>${s.count > 1 || s.def.kind === 'gadget' ? `<span class="cnt">${s.count}</span>` : ''}<span class="nm">${s.def.id === 'pickaxe' ? '' : s.def.name}</span><span class="rar" style="background:${s.def.id === 'pickaxe' ? 'transparent' : col}"></span></div>`;
+        html += `<div class="slot ${i === ch.inv.sel ? 'sel' : ''}" data-i="${i}"><span class="n">${i + 1}</span><span class="ic">${s.def.icon}</span>${s.count > 1 || s.def.kind === 'gadget' ? `<span class="cnt">${s.count}</span>` : ''}<span class="nm">${s.def.id === 'pickaxe' ? '' : s.def.name}</span><span class="rar" style="background:${s.def.id === 'pickaxe' ? 'transparent' : col}"></span></div>`;
       });
       this.$('#hotbar').innerHTML = html;
     }
