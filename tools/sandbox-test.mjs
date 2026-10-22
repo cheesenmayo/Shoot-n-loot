@@ -255,7 +255,7 @@ async function scenario(page, touch, cdp) {
     p.inv.slots[1] = window.__items.makeStack('ar', 2); p.inv.ammo.medium = 240; p.inv.sel = 0; p.equip(1); p.equipT = 0;
     window.__game.controller.mouseDown = true;
   });
-  for (let i = 0; i < 15; i++) {
+  for (let i = 0; i < 30; i++) {
     await E(() => { // keep the crosshair on the dummy (recoil kicks the view up)
       const g = window.__game, p = g.player, d = window.__t.enemies()[0], cam = g.camera.position;
       g.controller.yaw = Math.atan2(-(d.pos.x - cam.x), -(d.pos.z - cam.z));
