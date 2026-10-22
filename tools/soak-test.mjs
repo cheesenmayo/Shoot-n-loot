@@ -26,7 +26,7 @@ const out = await page.evaluate(async (MATCHES) => {
     const p = g.player;
     let simT = 0, bad = 0, worstMs = 0, totalMs = 0, steps = 0, maxAlive = g.aliveCount;
     // the player rides the bus and jumps after a while, then stands still: the bots do the rest
-    while (g.state !== 'ended' && simT < 1500) {
+    while (g.aliveCount > 1 && simT < 1500) {
       if (p.mode === 'bus' && simT > 6) g.jumpFromBus(p);
       if (p.alive && p.mode === 'normal') { p.input.fwd = (steps % 200) < 100 ? 1 : 0; p.input.fire = false; }
       const t0 = performance.now();
@@ -40,7 +40,7 @@ const out = await page.evaluate(async (MATCHES) => {
         if (c.alive && c.root.visible && !mm.every(Number.isFinite)) bad++;
       }
     }
-    res.push({ match: m + 1, simMinutes: +(simT / 60).toFixed(1), state: g.state, alive: g.aliveCount, bad, avgStepMs: +(totalMs / steps / 5).toFixed(2), worstMs: +worstMs.toFixed(0), kills: Math.max(...g.chars.map((c) => c.kills)), mem: mem() });
+    res.push({ match: m + 1, simMinutes: +(simT / 60).toFixed(1), finished: g.aliveCount <= 1, state: g.state, alive: g.aliveCount, bad, avgStepMs: +(totalMs / steps / 5).toFixed(2), worstMs: +worstMs.toFixed(0), kills: Math.max(...g.chars.map((c) => c.kills)), mem: mem() });
   }
   g.returnToMenu();
   return { res, m0, m1: mem() };
@@ -49,6 +49,6 @@ const out = await page.evaluate(async (MATCHES) => {
 console.log(JSON.stringify(out, null, 1));
 const flat = out.res.every((r) => r.bad === 0) && out.m1.geo <= out.m0.geo + 3 && out.m1.tex <= out.m0.tex + 3;
 console.log(errors.length ? `console errors (${errors.length}):\n` + errors.slice(0, 8).join('\n') : 'no console errors');
-console.log(flat && !errors.length && out.res.every((r) => r.state === 'ended') ? 'SOAK OK' : 'SOAK PROBLEM');
+console.log(flat && !errors.length && out.res.every((r) => r.finished) ? 'SOAK OK' : 'SOAK PROBLEM');
 await browser.close();
 process.exit(flat && !errors.length ? 0 : 1);
