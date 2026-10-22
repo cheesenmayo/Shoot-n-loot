@@ -62,7 +62,7 @@ export class Character {
     this.bloom = 0;
     this.spin = 0;
     this.recoil = 0;
-    this.buffs = { speedT: 0, jumpT: 0 };
+    this.buffs = { speedT: 0, jumpT: 0, runT: 0, run: 1 }; // Jumpple (speed + jump) and Runana (short sprint boost) are tracked separately
     this.hot = null;
     this.danceT = 0;
     this.grapple = null;
@@ -256,7 +256,7 @@ export class Character {
 
   canUse(def) {
     if (def.airOnly) return this.grounded || this.swimming || this.mode !== 'normal' ? 'Can only be eaten mid-air!' : null;
-    if (def.buff) return this.buffs.speedT > def.buff.dur * 0.8 ? 'Already super-charged' : null;
+    if (def.buff) return (def.buff.run ? this.buffs.runT : this.buffs.speedT) > def.buff.dur * 0.8 ? 'Already super-charged' : null;
     if (def.hp && !def.shield && !def.hot && this.hp >= def.hpCap) return 'Health is full';
     if (def.shield && !def.hp && this.shield >= def.shieldCap) return 'Shield is full';
     if (def.hp && def.shield && this.hp >= def.hpCap && this.shield >= def.shieldCap) return 'Already at full';
@@ -302,10 +302,15 @@ export class Character {
       if (def.hp || def.shield) this.heal(def.hp, def.shield, def.hpCap, def.shieldCap);
       if (def.hot) this.hot = { hp: def.hot.hp, shield: def.hot.shield, t: 0, dur: def.hot.dur };
       if (def.buff) {
-        this.buffs.speedT = def.buff.dur; this.buffs.jumpT = def.buff.dur;
-        this.buffs.speed = def.buff.speed; this.buffs.jump = def.buff.jump;
+        if (def.buff.run) {
+          this.buffs.runT = def.buff.dur; this.buffs.run = def.buff.speed;
+          g.fx.teleport(this.pos, 'cyan');
+        } else {
+          this.buffs.speedT = def.buff.dur; this.buffs.jumpT = def.buff.dur;
+          this.buffs.speed = def.buff.speed; this.buffs.jump = def.buff.jump;
+        }
         g.audio.play('jumpple', this.pos, { max: 40 });
-        if (this.isPlayer) g.hud?.toast('Jumpple! Super speed & jump');
+        if (this.isPlayer) g.hud?.toast(def.buff.run ? 'Runana! Sprint boost' : 'Jumpple! Super speed & jump');
       }
       if (def.shield && !def.buff) g.audio.play('shield', this.pos, { max: 40, vol: 0.6 });
       else if (def.hp >= 15) g.audio.play('heal', this.pos, { max: 40, vol: 0.6 });
@@ -337,6 +342,7 @@ export class Character {
     this.recoil = Math.max(0, this.recoil - 9 * dt);
     this.buffs.speedT = Math.max(0, this.buffs.speedT - dt);
     this.buffs.jumpT = Math.max(0, this.buffs.jumpT - dt);
+    this.buffs.runT = Math.max(0, this.buffs.runT - dt);
     this.danceT = Math.max(0, this.danceT - dt);
     if (this.hot) {
       this.hot.t += dt;
@@ -346,6 +352,7 @@ export class Character {
       if (this.hot.t >= this.hot.dur) this.hot = null;
     }
     if (this.danceT > 0) { inp.fire = false; inp.firePressed = false; inp.jumpPressed = false; }
+    if (this.buffs.runT > 0 && this.grounded && (this.isPlayer || g.nearPlayer(this.pos, 60)) && Math.random() < dt * 24) g.fx.heal(this.pos, 'speed');
 
     // movement
     let left = dt;
@@ -370,7 +377,10 @@ export class Character {
   // ---- ground / swim movement ------------------------------------------------------------------------------------------
   speedMul() {
     let m = 1;
-    if (this.buffs.speedT > 0) m *= this.buffs.speed || 1.38;
+    let boost = 1;
+    if (this.buffs.speedT > 0) boost = this.buffs.speed || 1.38;
+    if (this.buffs.runT > 0) boost = Math.max(boost, this.buffs.run || 1.65);
+    m *= boost;
     if (this.using) m *= 0.55;
     if (this.ads) m *= 0.65;
     const st = this.stack;

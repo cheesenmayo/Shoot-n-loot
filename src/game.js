@@ -225,6 +225,7 @@ export class Game {
     this.controller.char = player;
     this.controller.yaw = this.bus.group.rotation.y;
     this.controller.pitch = -0.2;
+    this.controller.distSm = this.controller.offSm = this.controller.heightSm = null;
     this.controller.spectate.target = null;
     this.forcedJump = false;
     this.busStartT = this.time;

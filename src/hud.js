@@ -123,6 +123,7 @@ export class HUD {
         <div class="bar shield"><div id="shield-fill"></div><span id="shield-txt">0</span></div>
         <div class="bar hp"><div id="hp-fill"></div><span id="hp-txt">100</span></div>
       </div>
+      <div class="buffs" id="buffs"></div>
       <div class="hotbar" id="hotbar"></div>
       <div class="ammo" id="ammo"></div>
       <div class="busui hidden" id="busui"><div class="big"><span class="kb">PRESS SPACE TO JUMP</span><span class="tc">TAP JUMP TO DROP</span></div><div class="sm"><span class="kb">Soar over the island · look for a landing spot (M for map)</span><span class="tc">Soar over the island · pick a landing spot on the map</span></div></div>
@@ -405,6 +406,7 @@ export class HUD {
     else cast.classList.add('hidden');
 
     this.updateHotbar(ch);
+    this.updateBuffs(ch);
 
     // minimap
     this.mmT -= dt;
@@ -432,6 +434,18 @@ export class HUD {
     fp.classList.toggle('hidden', !settings.showFps);
     if (settings.showFps && this.fpsN >= 20) { fp.textContent = Math.round(this.fpsAcc / this.fpsN) + ' FPS'; this.fpsAcc = 0; this.fpsN = 0; }
     void inMatch;
+  }
+
+  /** Little timers above the health bar for temporary boosts (Jumpple, Runana). */
+  updateBuffs(ch) {
+    const b = ch.buffs;
+    const list = [];
+    if (ch.alive && b.runT > 0) list.push(['run', '🏃 Runana', b.runT]);
+    if (ch.alive && b.speedT > 0) list.push(['jump', '🍏 Jumpple', b.speedT]);
+    const sig = list.map((x) => x[0] + Math.ceil(x[2])).join('|');
+    if (sig === this.lastBuffs) return;
+    this.lastBuffs = sig;
+    this.$('#buffs').innerHTML = list.map(([cls, name, t]) => `<div class="buff ${cls}">${name}<b>${Math.ceil(t)}s</b></div>`).join('');
   }
 
   updateHotbar(ch) {

@@ -85,6 +85,7 @@ cons({ id: 'big_shield', name: 'Shield Potion', icon: '🔵', model: 'big_shield
 cons({ id: 'chug_jug', desc: 'Full health and shield.', name: 'Chug Jug', icon: '🏺', model: 'chug_jug', hp: 100, shield: 100, time: 12, stack: 1, weight: 2, minR: 3, tags: ['shield'] });
 cons({ id: 'slurp', desc: 'Restores health and shield over time.', name: 'Slurp Juice', icon: '🧃', model: 'slurp', hot: { hp: 30, shield: 30, dur: 14 }, time: 1.6, stack: 3, weight: 5, minR: 2, tags: ['shield'] });
 cons({ id: 'jumpple', desc: 'Run faster and jump higher for 30 seconds.', name: 'Jumpple', icon: '🍏', model: 'jumpple', hp: 5, time: 1.0, stack: 4, weight: 8, buff: { speed: 1.38, jump: 1.6, dur: 30 }, tags: ['parkour', 'food'], maxR: 2 });
+cons({ id: 'runana', desc: 'Run faster for 5 seconds and restore up to 15 shield (no health).', name: 'Runana', icon: '🏃', model: 'runana', shield: 15, shieldCap: 100, time: 1.0, stack: 4, weight: 9, buff: { speed: 1.65, dur: 5, run: true }, tags: ['shield', 'food'], maxR: 2 });
 cons({ id: 'floorange', desc: 'Only edible mid-air. Teleports you to the ground with no fall damage and heals 10 HP.', name: 'Floorange', icon: '🍊', model: 'floorange', hp: 10, time: 0.55, stack: 4, weight: 8, airOnly: true, tags: ['floorange', 'food'], maxR: 1 });
 
 export const ITEM_LIST = Object.values(ITEMS);

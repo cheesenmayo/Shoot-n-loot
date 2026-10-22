@@ -283,7 +283,8 @@ export class PlayerController {
   updateCamera(dt) {
     const g = this.game, ch = this.char, cam = g.camera, w = g.world;
     const target = this.cameraTarget();
-    let dist = 3.2, offset = 0.85 * this.shoulder, height = ch.crouching ? 1.2 : 1.6;
+    // close over-the-shoulder framing; distance / shoulder / eye height are eased so stance and aim changes glide
+    let dist = 2.1, offset = 0.6 * this.shoulder, height = ch.crouching ? 1.2 : 1.6;
     let fovT = settings.fov;
     this.scoped = false;
     let pivot;
@@ -308,9 +309,16 @@ export class PlayerController {
         const z = st.def.zoom;
         fovT = settings.fov * z;
         if (z < 0.4) this.scoped = true; // sniper scope
-        else { dist = 1.5; offset = 0.42 * this.shoulder; }
-      } else if (ch.sprinting) fovT += 7;
+        else { dist = 1.0; offset = 0.34 * this.shoulder; }
+      } else if (ch.sprinting) { fovT += 7; dist += 0.25; }
+      if (ch.buffs.runT > 0) fovT += 6;
       if (ch.swimming) height = 0.9;
+      // ease the framing (not for the bus / skydive / spectate cameras, which jump between rigs)
+      this.distSm = this.distSm == null ? dist : damp(this.distSm, dist, 12, dt);
+      this.offSm = this.offSm == null ? offset : damp(this.offSm, offset, 12, dt);
+      this.heightSm = this.heightSm == null ? height : damp(this.heightSm, height, 12, dt);
+      dist = this.distSm; offset = this.offSm; height = this.heightSm;
+      pivot.y = ch.pos.y + height;
     }
     this.fov = damp(this.fov, fovT, 12, dt);
 

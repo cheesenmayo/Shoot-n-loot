@@ -78,6 +78,11 @@ kbd { background: rgba(255, 255, 255, 0.14); border: 1px solid var(--line); bord
 .slot .rar { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; }
 .slot .nm { position: absolute; left: 0; right: 0; bottom: 6px; text-align: center; font-size: 9px; opacity: 0.8; white-space: nowrap; overflow: hidden; transform: skewX(6deg); }
 .slot.empty { opacity: 0.4; }
+.buffs { position: absolute; left: 50%; bottom: 152px; transform: translateX(-50%); display: flex; gap: 6px; }
+.buff { background: rgba(10, 14, 26, 0.75); border: 1px solid var(--line); border-radius: 4px; padding: 3px 10px; font-size: 14px; font-weight: 800; text-shadow: 0 1px 2px #000; transform: skewX(-8deg); animation: fin 0.2s ease-out; }
+.buff b { margin-left: 8px; color: var(--accent); font-variant-numeric: tabular-nums; }
+.buff.run { border-color: var(--accent2); }
+.buff.run b { color: var(--accent2); }
 .ammo { position: absolute; right: 26px; bottom: 26px; text-align: right; text-shadow: 0 2px 4px #000; }
 .ammo .big { font-size: 46px; font-weight: 900; font-style: italic; line-height: 1; }
 .ammo .big small { font-size: 22px; opacity: 0.75; font-weight: 700; }
@@ -206,6 +211,8 @@ body.touch .slot .ic { font-size: clamp(18px, calc(5.4 * var(--vh)), 26px); }
 body.touch .slot .nm { display: none; }
 body.touch .slot .n { font-size: 10px; }
 body.touch .slot .cnt { font-size: 12px; }
+body.touch .buffs { bottom: calc(env(safe-area-inset-bottom, 0px) + calc(25 * var(--vh))); }
+body.touch .buff { font-size: 11px; padding: 1px 7px; }
 body.touch .vitals { bottom: calc(env(safe-area-inset-bottom, 0px) + calc(14 * var(--vh))); width: clamp(170px, 34vw, 300px); }
 body.touch .bar { height: clamp(12px, calc(4.4 * var(--vh)), 18px); }
 body.touch .bar span { font-size: 11px; line-height: clamp(10px, calc(3.6 * var(--vh)), 14px); }

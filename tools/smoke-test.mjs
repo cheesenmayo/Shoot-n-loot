@@ -114,6 +114,22 @@ const results = await page.evaluate(async () => {
   p.buffs.speedT = 0; useItem('jumpple', 1.5); ok('jumpple grants speed+jump buff', p.buffs.speedT > 20 && p.buffs.jumpT > 20, p.buffs.speedT.toFixed(1));
   p.buffs.speedT = p.buffs.jumpT = 0;
 
+  // ---- Runana: 5 s sprint boost + 15 shield (no health), usable at full health / shield ----
+  const sprintSpeed = () => { p.input.fwd = 1; p.input.sprint = true; step(1.2); const s = Math.hypot(p.vel.x, p.vel.z); p.input.fwd = 0; p.input.sprint = false; step(0.5); return s; };
+  toGround(plaza.x + 30, plaza.z + 20); const baseSpeed = sprintSpeed();
+  useItem('runana', 1.5, 80, 20);
+  ok('runana: +15 shield, no health', Math.abs(p.shield - 35) < 0.5 && p.hp === 80, `${p.hp}/${p.shield}`);
+  ok('runana: boost lasts ~5 s', p.buffs.runT > 3 && p.buffs.runT <= 5, p.buffs.runT.toFixed(2));
+  p.input.fwd = 1; p.input.sprint = true; step(1.0); const boosted = Math.hypot(p.vel.x, p.vel.z); p.input.fwd = 0; p.input.sprint = false;
+  ok('runana: noticeably faster', boosted > baseSpeed * 1.4, `${boosted.toFixed(2)} vs ${baseSpeed.toFixed(2)}`);
+  p.buffs.runT = 4.8; p.inv.slots[3] = makeStack('runana', 0, 2); p.equip(3); p.equipT = 0; p.input.firePressed = true; step(0.3);
+  ok('runana: refused while the boost is fresh', p.using === null && p.inv.slots[3].count === 2, p.using);
+  step(6);
+  ok('runana: boost expires', p.buffs.runT === 0, p.buffs.runT);
+  useItem('runana', 1.5, 100, 95);
+  ok('runana: shield capped at 100, still usable at full hp', p.shield === 100 && p.buffs.runT > 0, `${p.hp}/${p.shield}`);
+  p.buffs.runT = 0;
+
   // boogie bomb makes the target dance
   toGround(plaza.x - 20, plaza.z + 36);
   const dd = dummy(plaza.x - 20 + 8, plaza.z + 36, 1000);

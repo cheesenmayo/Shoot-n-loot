@@ -306,7 +306,7 @@ export class Bot {
   useSpeedBoost() {
     const ch = this.ch;
     if (ch.buffs.speedT > 0 || ch.using) return;
-    const i = ch.inv.find((s) => s.def.id === 'jumpple');
+    const i = ch.inv.find((s) => s.def.id === 'jumpple' || s.def.id === 'runana');
     if (i >= 0 && Math.random() < 0.5) { this.healItem = i; this.state = 'heal'; }
   }
 
@@ -320,6 +320,7 @@ export class Bot {
     if (ch.hp < 75) { let i = need('bandage'); if (i >= 0) return i; i = need('medkit'); if (i >= 0 && ch.hp < 60) return i; }
     if (ch.hp < 95) { let i = need('apple'); if (i >= 0) return i; i = need('banana'); if (i >= 0) return i; }
     if (ch.shield < 90) { const i = need('mushroom'); if (i >= 0) return i; }
+    if (ch.shield < 85 && ch.buffs.runT <= 0) { const i = need('runana'); if (i >= 0) return i; }
     return null;
   }
 
@@ -410,7 +411,7 @@ export class Bot {
       case 'consume': {
         const have = inv.countOf(def.id);
         if (!free && have === 0) return 0;
-        const w = { medkit: 4.5, big_shield: 4.5, small_shield: 3.8, bandage: 2.6, chug_jug: 9, slurp: 5, apple: 0.8, banana: 0.8, mushroom: 1, jumpple: 1.5, floorange: 1.2 }[def.id] || 1;
+        const w = { medkit: 4.5, big_shield: 4.5, small_shield: 3.8, bandage: 2.6, chug_jug: 9, slurp: 5, apple: 0.8, banana: 0.8, mushroom: 1, jumpple: 1.5, runana: 1.5, floorange: 1.2 }[def.id] || 1;
         return have >= def.stack * 0.7 ? 0 : w;
       }
       case 'throw': return free || inv.countOf(def.id) > 0 ? 1.6 : 0;

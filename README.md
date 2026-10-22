@@ -92,7 +92,8 @@ Items lie on the ground (follow the coloured beams) or in glowing chests.
 * **Throwables** – Frag Grenade, **Impulse Grenade** (shoves players, great for traversal), Dynamite, Boogie Bomb
 * **Gadgets** – **Grappler** (swing to any surface), **Launch Pad**
 * **Consumables** – Apple, Banana, Shield Mushroom, Bandage, Medkit, Mini Shield, Shield Potion, Chug Jug, Slurp Juice,
-  **Jumpple** (🍏 run faster and jump higher for 30 s) and **Floorange** (🍊 only edible **mid‑air**: teleports you to the ground
+  **Jumpple** (🍏 run faster and jump higher for 30 s), **Runana** (🏃 a sprint boost for 5 s and up to 15 shield, no health)
+  and **Floorange** (🍊 only edible **mid‑air**: teleports you to the ground
   with no fall damage and heals 10 HP)
 
 Fall damage is real: drops from more than ~6 m hurt, so keep a Floorange or a launch pad handy.
