@@ -12,9 +12,9 @@ const PROP_CHUNK = 256;
 
 function pineGeo(snowy = false) {
   const b = new Batch(snowy ? 12 : 11);
-  b.cyl(0, 0, 0, 0.32, 3.4, 0x5a4330, { sides: 6, rTop: 0.2, noCap: true });
+  b.cyl(0, 0, 0, 0.32, 4.0, 0x5a4330, { sides: 6, rTop: 0.2, noCap: true });
   for (let i = 0; i < 5; i++) {
-    const y = 1.9 + i * 1.85, r = 2.6 - i * 0.46, h = 2.7;
+    const y = 2.5 + i * 1.8, r = 2.6 - i * 0.46, h = 2.7;
     const col = snowy ? (i % 2 ? 0xdfe9ee : 0x2f5a44) : [0x2d5a2e, 0x336633, 0x2a5530, 0x3a6b35, 0x2e6034][i];
     b.cyl(0, y, 0, r, h, col, { sides: 8, rTop: 0.001, noCap: true, ao: 0.62, jit: 0.07 });
   }
@@ -89,15 +89,18 @@ function deadTreeGeo() {
 
 function orangeTreeGeo() {
   const b = new Batch(61);
-  b.limb(0, 0, 0, 0, 1.9, 0, 0.26, 0.2, 0x5d4430, { sides: 6 });
-  b.blob(0, 3.0, 0, 2.5, 1.9, 2.5, 0x2f6a2c, { seg: 9, rings: 5, wobble: 0.12 });
-  b.blob(1.1, 2.4, 0.9, 1.5, 1.2, 1.5, 0x37762f, { seg: 7, rings: 4 });
-  b.blob(-1.2, 2.6, -0.8, 1.5, 1.2, 1.5, 0x2a6228, { seg: 7, rings: 4 });
+  b.limb(0, 0, 0, 0, 2.7, 0, 0.27, 0.2, 0x5d4430, { sides: 6 });
+  b.limb(0, 2.2, 0, 1.1, 3.3, 0.4, 0.12, 0.07, 0x5d4430, { sides: 5 });
+  b.limb(0, 2.3, 0, -1.0, 3.4, -0.5, 0.12, 0.07, 0x5d4430, { sides: 5 });
+  // canopy stays above head height so the camera never sits inside the leaves
+  b.blob(0, 4.1, 0, 2.5, 1.7, 2.5, 0x2f6a2c, { seg: 9, rings: 5, wobble: 0.12 });
+  b.blob(1.1, 3.6, 0.9, 1.5, 1.1, 1.5, 0x37762f, { seg: 7, rings: 4 });
+  b.blob(-1.2, 3.7, -0.8, 1.5, 1.1, 1.5, 0x2a6228, { seg: 7, rings: 4 });
   const rng = mulberry32(5);
   for (let i = 0; i < 16; i++) {
-    const a = rng() * Math.PI * 2, e = rng() * 0.8 - 0.1;
+    const a = rng() * Math.PI * 2, e = rng() * 0.7 - 0.45;
     const rr = 2.35 * Math.cos(e);
-    b.blob(Math.cos(a) * rr, 3.0 + Math.sin(e) * 1.7, Math.sin(a) * rr, 0.22, 0.22, 0.22, 0xff8a14, { seg: 5, rings: 3, wobble: 0.04, ao: 0.9, jit: 0.08 });
+    b.blob(Math.cos(a) * rr, 4.1 + Math.sin(e) * 1.5, Math.sin(a) * rr, 0.22, 0.22, 0.22, 0xff8a14, { seg: 5, rings: 3, wobble: 0.04, ao: 0.9, jit: 0.08 });
   }
   return b.build();
 }
@@ -182,7 +185,7 @@ export class Props {
       cactus: { geo: cactusGeo(0), mat: this.treeMat, trunk: 0.5, h: 4 },
       cactus2: { geo: cactusGeo(1), mat: this.treeMat, trunk: 0.5, h: 5 },
       dead: { geo: deadTreeGeo(), mat: this.treeMat, trunk: 0.3, h: 4 },
-      orange: { geo: orangeTreeGeo(), mat: this.treeMat, trunk: 0.3, h: 5 },
+      orange: { geo: orangeTreeGeo(), mat: this.treeMat, trunk: 0.3, h: 6 },
       rockS: { geo: rockGeo(0), mat: this.rockMat, trunk: 1.0, h: 1.4, rock: true },
       rockM: { geo: rockGeo(1), mat: this.rockMat, trunk: 1.5, h: 2.2, rock: true },
       rockL: { geo: rockGeo(2), mat: this.rockMat, trunk: 2.8, h: 5, rock: true },

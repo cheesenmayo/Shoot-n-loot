@@ -9,7 +9,7 @@ const { chromium } = createRequire(import.meta.url)('playwright');
 const root = join(fileURLToPath(import.meta.url), '..', '..');
 const [script = 'return 1', shot = '', query = ''] = process.argv.slice(2);
 const browser = await chromium.launch({
-  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--no-sandbox'],
+  args: ['--autoplay-policy=no-user-gesture-required', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--no-sandbox'],
 });
 const page = await browser.newPage({ viewport: { width: 1024, height: 576 } });
 const logs = [];

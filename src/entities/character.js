@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { characterModel, itemModel, gliderModel } from '../models.js';
 import { Inventory, SLOT_COUNT } from '../inventory.js';
 import { ITEMS, RARITIES, gunReload, makeStack } from '../items.js';
-import { WORLD } from '../world/terrain.js';
+import { WORLD, envAt } from '../world/terrain.js';
 import { clamp, lerp, damp, dampAngle, wrapAngle } from '../util.js';
 
 export const PHYS = {
@@ -14,6 +14,7 @@ export const PHYS = {
 
 const _v = new THREE.Vector3();
 const _hit = {};
+const _env = { desert: 0, snow: 0, rock: 0, forest: 0, sand: 0 };
 
 export class Character {
   constructor(game, o) {
@@ -433,6 +434,23 @@ export class Character {
       if (Math.abs(az) < Math.abs(this.vel.z)) this.vel.z = az;
     } else if (pushed && this.grapple) {
       this.grapple = null;
+    }
+
+    // footsteps (nearby enemies are audible too)
+    if (this.grounded && !this.swimming) {
+      this.stepDist += Math.hypot(p.x - ox, p.z - oz);
+      if (this.stepDist > (this.sprinting ? 2.9 : this.crouching ? 1.6 : 2.2)) {
+        this.stepDist = 0;
+        if (!this.crouching && (this.isPlayer || g.nearPlayer(p, 38))) {
+          const th = w.terrain.height(p.x, p.z);
+          let lp = 1500; // hard surfaces: floors, platforms
+          if (Math.abs(p.y - th) < 0.2) {
+            const e = envAt(p.x, p.z, th, 0, _env);
+            lp = e.snow > 0.5 ? 380 : e.desert > 0.5 || e.sand > 0.5 ? 480 : 760;
+          }
+          g.audio.play('step', this.isPlayer ? null : p, { vol: this.isPlayer ? 0.28 : 0.8, max: 38, lp });
+        }
+      }
     }
 
     // vertical -----------------------------------------------------------------------------------------------------
