@@ -13,8 +13,6 @@ for (let i = 0; i < 256; i++) {
   SRGB[i] = Math.round(255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055));
 }
 
-export const iconCached = (id) => cache.get(id) || null;
-
 /** Renders thumbnails for `ids` one after another. `onIcon(id, dataUrl)` fires as each one is ready. */
 export async function renderIcons(game, ids, onIcon) {
   const todo = ids.filter((id) => !cache.has(id));

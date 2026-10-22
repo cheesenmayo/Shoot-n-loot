@@ -276,7 +276,8 @@ export class Bot {
     if (g.sandbox && this.mode === 'hostile') {
       const target = g.player;
       if (target && target.alive && target.mode !== 'bus' && Math.hypot(target.pos.x - ch.pos.x, target.pos.z - ch.pos.z) > 8) {
-        if (!this.goal || this.reached(this.goal) || now - this.goalT > 3) {
+        // plan a new route only when the player has moved away from where we are heading (route planning is the costly part)
+        if (!this.goal || this.reached(this.goal) || (now - this.goalT > 1.5 && Math.hypot(this.goal.x - target.pos.x, this.goal.z - target.pos.z) > 10)) {
           this.goalT = now;
           this.setGoal(target.pos.x, target.pos.z, true, 6);
         }

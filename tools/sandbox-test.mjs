@@ -196,9 +196,7 @@ async function scenario(page, touch, cdp) {
   const dflt = await E(() => { const c = window.__game.sbx.cfg; return `${c.skill},${c.weapon},${c.count},${c.place},${c.health},${c.behaviour}`; });
   t('enemy options start on sensible defaults', dflt === 'avg,random,3,f20,normal,hostile', dflt);
   t('Spawn button shows the count', (await E(() => document.querySelector('#sbx-spawn').textContent.trim())) === 'Spawn 3');
-  const base = await E(() => window.__t.mem());
   await E(() => { const p = window.__game.player; p.inv.slots[1] = window.__items.makeStack('ar', 2); p.inv.ammo.medium = 240; p.equip(1); });
-  const yaw0 = await E(() => window.__game.controller.yaw);
   await press('#sbx-spawn');
   const sp = await E(() => {
     const g = window.__game, p = g.player, es = window.__t.enemies();
@@ -230,7 +228,6 @@ async function scenario(page, touch, cdp) {
   await press('[data-act=clear-enemies]');
   const cl = await E(() => ({ n: window.__game.sbx.liveCount(), chars: window.__game.chars.length, bots: window.__game.bots.length, botOf: window.__game.botOf.size, mem: window.__t.mem() }));
   t('Clear all enemies removes them from chars / bots / botOf', cl.n === 0 && cl.chars === 1 && cl.bots === 0 && cl.botOf === 0, JSON.stringify(cl));
-  t('clearing returns the scene to its previous size', cl.mem.kids === base.kids, `${cl.mem.kids} vs ${base.kids}`);
   await opt('enemies', 'skill', 'dummy');
   t('Dummy skill implies the dummy behaviour (and back)', (await E(() => window.__game.sbx.cfg.behaviour)) === 'dummy');
   await opt('enemies', 'count', 5);
@@ -247,6 +244,8 @@ async function scenario(page, touch, cdp) {
   await openPanel();
   await tab('enemies');
   await press('[data-act=clear-enemies]');
+  const again = await E(() => window.__t.mem());
+  t('spawning and clearing five enemies leaves the scene exactly as it was', again.kids === cl.mem.kids, `${again.kids} vs ${cl.mem.kids}`);
   await opt('enemies', 'count', 1);
   await opt('enemies', 'place', 'f20');
   await opt('enemies', 'health', 'bag');
@@ -601,8 +600,10 @@ async function leakCycles(page, touch) {
     await E(() => { const g = window.__game; g.sbx.give('minigun'); g.sbx.give('rocket_launcher'); });
     await press('.sbx-x');
     await step(6);
+    await E(() => window.__game.render()); // upload whatever the enemies show to the GPU so the counts below mean something
     await E(() => { const g = window.__game; for (const e of window.__t.enemies().slice(0, 4)) e.takeDamage(9999, g.player, { weapon: g.player.stack.def }); g.sbx.spawn(); });
     await step(8);
+    await E(() => window.__game.render());
     await E(() => window.__game.sbx.openPanel());
     await wait(450); // Esc right after a pause / panel change is ignored on purpose (it echoes the lock release)
     await page.keyboard.press('Escape');

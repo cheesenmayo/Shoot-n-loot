@@ -75,7 +75,8 @@ phone, or *Sandbox tools* in the pause menu) to open the tools drawer. While it 
   readout shows the health of whoever you hit last.
 * **Player**: God mode (no damage, no fall damage), Infinite ammo, Infinite consumables, Super speed, **Heal**, teleports to all
   eight locations (always to a safe spot on the ground), a 300 m **Sky drop**, and a time scale (0.25× / 0.5× / 1×) for
-  studying animations and projectiles.
+  studying animations and projectiles. Enemies stay where they are when you teleport (hostile ones come running after
+  you), so use **Clear all enemies** for a clean slate.
 * **Readout**: total damage, DPS over the last 3 s and the last hit (with a HEAD flag) are shown on the HUD and in the
   drawer footer, with a reset button.
 * If you are eliminated you respawn at the same spot after about 1.5 s with full health and your inventory (unless God mode
