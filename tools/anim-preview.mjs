@@ -1,6 +1,6 @@
 // Contact-sheet renderer for the character animation system.
 //   node tools/anim-preview.mjs <sheet> [--views=tps,side,front] [--cols=6] [--tile=300x360] [--only=text] [--out=name]
-// Sheets: models, loco, guns, melee, items, hits, death, air, all. Output: tools/shots/anim-<name>.png (look at it with an image viewer).
+// Sheets: models, heads, quick, loco, guns, allguns, reload, melee, items, hits, death, air, all. Output: tools/shots/anim-<name>.png (look at it with an image viewer).
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
@@ -93,6 +93,20 @@ const SHEETS = {
         S.hold('pickaxe', c);
         S.step(0.3);
         S.snap('#' + i + ' ' + c.skill, c);
+        S.reset(c, { x: S.x + 40 + i * 2.5, z: S.z + 40 }); // out of the way for the next one
+      }
+    } },
+  ],
+  heads: [
+    { title: 'faces: player + 11 bots (front / side)', views: ['face', 'faceS'], run: async (S) => {
+      const g = window.__game;
+      const cs = [g.player, ...g.bots.slice(0, 11).map((b) => b.ch)];
+      for (let i = 0; i < cs.length; i++) {
+        const c = cs[i];
+        S.reset(c, { x: S.x, z: S.z });
+        S.step(0.3);
+        S.snap('#' + i + ' ' + c.skill, c);
+        S.reset(c, { x: S.x + 40 + i * 2.5, z: S.z + 40 });
       }
     } },
   ],

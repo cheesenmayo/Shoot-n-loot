@@ -76,6 +76,7 @@ export class Animator {
     this.cwp = new THREE.Vector3(0.2, 0.2, -0.2); this.cwq = new THREE.Quaternion();
     this.clp = new THREE.Vector3(); this.clq = new THREE.Quaternion();
     this.limQ = []; for (let i = 0; i < 6; i++) this.limQ.push(new THREE.Quaternion()); this.limInit = false; this.dtLast = 0.016;
+    this.armJ = [m.armR.a, m.armR.fore, m.armR.hand, m.armL.a, m.armL.fore, m.armL.hand]; // joints the rate limiter watches
     this.overL = 0; this.overR = 0; // how far the last hand targets were beyond the arm's reach
     this.lAbsPrev = false; this.wpLast = new THREE.Vector3(); this.wqLast = new THREE.Quaternion();
     this.qAim = new THREE.Quaternion(); this.qAimEff = new THREE.Quaternion();
@@ -512,7 +513,7 @@ export class Animator {
     this.clp.lerp(H.lp, kr);
     this.clq.slerp(H.lq, kr);
     spring(X, V, S_RW, H.rw, 12, dt);
-    spring(X, V, S_LW, H.lw, 14, dt);
+    spring(X, V, S_LW, H.lw, H.lwRate, dt);
     const rw = clamp(X[S_RW], 0, 1), lw = clamp(X[S_LW], 0, 1);
 
     // ---- weapon pose = smoothed target + additive layers
@@ -573,9 +574,8 @@ export class Animator {
 
   /** Safety net against single-frame pops: no arm joint may turn faster than a (very quick) swing. */
   limitArms(dt) {
-    const m = this.m, Q = this.limQ;
+    const Q = this.limQ, J = this.armJ;
     const maxStep = 3000 * Math.PI / 180 * dt;
-    const J = [m.armR.a, m.armR.fore, m.armR.hand, m.armL.a, m.armL.fore, m.armL.hand];
     for (let i = 0; i < 6; i++) {
       const q = J[i].quaternion, prev = Q[i];
       if (this.limInit) {

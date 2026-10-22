@@ -31,6 +31,7 @@ const qe = (out, x, y, z, order = 'YXZ') => out.setFromEuler(_e.set(x, y, z, ord
 export class Hold {
   constructor() {
     this.rw = 0; this.lw = 0; // IK weights (targets)
+    this.lwRate = 14; // how fast the support hand blends in
     this.wp = new THREE.Vector3(0.2, 0.2, -0.2); this.wq = new THREE.Quaternion();
     this.lAbs = false; // left target is absolute (torso space) instead of weapon relative
     this.lp = new THREE.Vector3(); this.lq = new THREE.Quaternion();
@@ -373,6 +374,7 @@ function meleeHold(H, A, def, info, st) {
     H.lAbs = false;
     H.lp.set(sp.grip[0], sp.grip[1], sp.grip[2]);
     H.lw = sp.two ? 1 : 0;
+    H.lwRate = 42; // the support hand is on the handle before the wind-up peaks
     H.headY = -_s[6] * 0.4;
     H.lookW = 0.3;
   } else {
@@ -590,7 +592,7 @@ export function computeHold(A) {
   const def = st ? st.def : null;
   const info = A.info;
   // defaults every frame
-  H.rw = def ? 1 : 0; H.lw = 0; H.lAbs = false; H.rate = 26;
+  H.rw = def ? 1 : 0; H.lw = 0; H.lwRate = 14; H.lAbs = false; H.rate = 26;
   H.spineX = H.spineY = H.spineZ = 0; H.pelvisY = 0; H.stepZ = 0; H.stepX = 0;
   H.headX = H.headY = H.headZ = 0; H.lookW = 1;
   H.itemVisible = true; H.itemScale = 1;

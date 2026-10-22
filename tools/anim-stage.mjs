@@ -159,18 +159,21 @@ export function stageInit() {
       const b = c.bodyYaw;
       const bsy = Math.sin(b), bcy = Math.cos(b);
       const bfx = -bsy, bfz = -bcy, brx = bcy, brz = -bsy;
-      const d = view === 'wide' ? 5.2 : 3.4;
+      const d = view === 'wide' ? 5.2 : view === 'face' || view === 'faceS' ? 1.15 : 3.4;
       const cx = px, cz = pz;
       let ox = 0, oz = 0;
       if (view === 'side' || view === 'wide') { ox = brx * d; oz = brz * d; }
       else if (view === 'front') { ox = bfx * d; oz = bfz * d; }
       else if (view === 'back') { ox = -bfx * d; oz = -bfz * d; }
       else if (view === 'sideL') { ox = -brx * d; oz = -brz * d; }
+      else if (view === 'face') { ox = bfx * d; oz = bfz * d; }
+      else if (view === 'faceS') { ox = brx * d; oz = brz * d; }
       else if (view === 'top') { ox = brx * 0.4; oz = brz * 0.4; }
-      const h = view === 'top' ? 4.2 : 1.15;
+      const face = view === 'face' || view === 'faceS';
+      const h = view === 'top' ? 4.2 : face ? 1.55 : 1.15;
       cam.position.set(cx + ox, py + h, cz + oz);
       cam.fov = view === 'wide' ? 34 : 38;
-      cam.lookAt(cx, py + (view === 'top' ? 0.4 : 0.95), cz);
+      cam.lookAt(cx, py + (view === 'top' ? 0.4 : face ? 1.55 : 0.95), cz);
     }
     cam.aspect = S.tile[0] / S.tile[1];
     cam.updateProjectionMatrix();
