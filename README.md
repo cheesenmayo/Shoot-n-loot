@@ -147,8 +147,8 @@ Items lie on the ground (follow the coloured beams) or in glowing chests.
 * **Rifles** – Assault Rifle, Burst Rifle, Heavy AR, Lever‑Action Rifle
 * **Shotguns** – Pump, Tactical, Double Barrel, Auto Shotgun · **Snipers** – Bolt‑Action, Semi‑Auto
 * **Heavy** – LMG, Minigun · **Explosives** – Rocket Launcher, Grenade Launcher · **Crossbow**
-* **Throwables** – Frag Grenade, **Impulse Grenade** (shoves players, great for traversal), Dynamite, Boogie Bomb
-* **Gadgets** – **Grappler** (swing to any surface), **Launch Pad**
+* **Throwables** – Frag Grenade, **Impulse Grenade** (shoves players; throw it at your feet to be launched sky‑high, and that launch comes with no fall damage), Dynamite, Boogie Bomb
+* **Gadgets** – **Grappler** (the rope pulls you toward any surface for about 1.5 s while you hang loose, holding it at your side like in a normal fall, and you can steer or jump off the whole way), **Launch Pad**
 * **Consumables** – Apple, Banana, Shield Mushroom, Bandage, Medkit, Mini Shield, Shield Potion, Chug Jug, Slurp Juice,
   **Jumpple** (🍏 run faster and jump higher for 30 s), **Runana** (🏃 a sprint boost for 5 s and up to 15 shield, no health)
   and **Floorange** (🍊 only edible **mid‑air**: teleports you to the ground

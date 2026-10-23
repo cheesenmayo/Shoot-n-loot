@@ -372,12 +372,16 @@ export class Combat {
         _m.set(dx, dy, dz);
         if (_m.lengthSq() < 0.01) _m.set(0, 1, 0);
         _m.normalize();
-        _m.y = Math.max(_m.y, 0.35) + 0.25;
+        // an impulse blast throws things mostly skyward, so a grenade at your feet is a proper launch
+        _m.y = kind === 'impulse' ? Math.max(_m.y, 0.6) + 0.55 : Math.max(_m.y, 0.35) + 0.25;
         _m.normalize();
         const k = kind === 'impulse' ? impulse * (0.45 + 0.55 * f) : 8 * f + 2;
         c.vel.x += _m.x * k; c.vel.z += _m.z * k; c.vel.y = Math.max(c.vel.y, 0) + _m.y * k;
-        if (_m.y * k > 1.5) { c.grounded = false; c.swimming = false; c.grapple = null; }
-        if (kind === 'impulse') c.noFall = false;
+        if (_m.y * k > 1.5) {
+          c.grounded = false; c.swimming = false; c.grapple = null;
+          // landing after an impulse launch never hurts (nothing else grants this)
+          if (kind === 'impulse') c.noFall = true;
+        }
       }
     }
   }
@@ -428,7 +432,7 @@ export class Combat {
       const o = ch.aimOrigin, d = ch.aimDir;
       const t = g.world.collision.raycast(o.x, o.y, o.z, d.x, d.y, d.z, def.range + 4, hitInfo);
       if (t < 0) { if (ch.isPlayer) g.hud?.toast('Nothing to grapple'); return; }
-      ch.grapple = { x: hitInfo.x, y: hitInfo.y, z: hitInfo.z, t: 0 };
+      ch.grapple = { x: hitInfo.x, y: hitInfo.y, z: hitInfo.z, t: 0, g: 0.1 };
       ch.grounded = false;
       ch.vel.y = Math.max(ch.vel.y, 2);
       g.audio.play('grapple', ch.pos, { max: 80 });

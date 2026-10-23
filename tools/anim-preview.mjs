@@ -224,6 +224,13 @@ const SHEETS = {
       let t0 = 0.2;
       for (const t of [0.5, 0.9, 1.3, 1.8, 2.2, 2.6, 3.1, 3.5, 3.9, 4.4, 5.0, 5.7]) { S.step(t - t0); t0 = t; S.snap('t=' + t); }
     } },
+    { title: 'grappler: carry, pulled (loose hold), steering, let go', views: ['tps', 'side', 'front'], run: async (S) => {
+      S.reset(); const p = S.player(); S.give('grappler', 0, 1); S.step(0.5); S.snap('carry');
+      p.grapple = { x: p.pos.x - 10, y: p.pos.y + 22, z: p.pos.z - 24, t: 0, g: 0.1 }; p.grounded = false; p.vel.y = 2;
+      S.step(0.2); S.snap('pull +0.2'); S.step(0.25); S.snap('pull +0.45');
+      p.input.strafe = 1; S.step(0.35); S.snap('steer right'); p.input.strafe = 0;
+      S.step(0.3); S.snap('pull +1.3'); S.step(0.3); S.snap('let go'); S.step(0.4); S.snap('falling');
+    } },
     { title: 'grenade throw', views: ['tps', 'side'], run: async (S) => {
       S.reset(); const p = S.player(); S.give('frag', 1, 1); p.inv.slots[1].count = 3; S.step(0.4); S.snap('grenade carry');
       p.aimDir.set(0, 0.2, -1).normalize(); p.input.firePressed = true; S.step(1 / 60);

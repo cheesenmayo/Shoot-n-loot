@@ -12,6 +12,8 @@ export const PHYS = {
   walk: 6.2, sprint: 9.2, crouch: 3.0, swim: 3.7,
   jump: 8.8, gravity: 26, terminal: 62, accel: 55, airAccel: 14,
   fallSafe: 18, fallDmg: 4.6,
+  // grappler: seconds the rope pulls for, pull strength (m/s^2), free steering (m/s^2), top speed (m/s)
+  grappleTime: 1.5, grapplePull: 58, grappleSteer: 34, grappleSpeed: 36,
 };
 
 const _v = new THREE.Vector3();
@@ -430,7 +432,7 @@ export class Character {
     const tvx = wx * speed, tvz = wz * speed;
 
     // grappling pulls us toward the anchor
-    if (this.grapple) this.stepGrapple(dt);
+    if (this.grapple) this.stepGrapple(dt, wx, wz);
 
     const accel = this.grounded || this.swimming ? (wl > 0.01 ? PHYS.accel : PHYS.accel * 0.8) : PHYS.airAccel;
     if (!this.grapple) {
@@ -439,9 +441,6 @@ export class Character {
       const maxd = accel * dt;
       if (dl > maxd) { this.vel.x += (dvx / dl) * maxd; this.vel.z += (dvz / dl) * maxd; }
       else { this.vel.x = tvx; this.vel.z = tvz; }
-    } else {
-      // limited steering while swinging
-      this.vel.x += tvx * 0.8 * dt; this.vel.z += tvz * 0.8 * dt;
     }
 
     // horizontal move with step/slope checks, split by axis so we slide along walls
@@ -545,7 +544,7 @@ export class Character {
     }
     if (!this.grounded) {
       const prevY = p.y;
-      const grav = this.grapple ? PHYS.gravity * 0.35 : PHYS.gravity;
+      const grav = this.grapple ? PHYS.gravity * this.grapple.g : PHYS.gravity;
       this.vel.y = Math.max(-PHYS.terminal, this.vel.y - grav * dt);
       p.y += this.vel.y * dt;
       this.airTime += dt;
@@ -587,25 +586,34 @@ export class Character {
     if (this.using?.def.airOnly) this.cancelUse();
   }
 
-  stepGrapple(dt) {
+  /**
+   * The rope drags us toward the anchor for PHYS.grappleTime seconds. We hang loose the whole way: the pull
+   * eases off and gravity comes back, and the move keys steer freely (pushing away from the anchor slackens
+   * the pull) so the pull can be bent or cancelled. Jump lets go; reaching the anchor or running out of
+   * time lets go too and keeps the momentum.
+   */
+  stepGrapple(dt, wx, wz) {
     const gp = this.grapple;
     gp.t += dt;
     const p = this.pos;
     const dx = gp.x - p.x, dy = gp.y - (p.y + 1.1), dz = gp.z - p.z;
     const d = Math.hypot(dx, dy, dz);
-    if (d < 2.4 || gp.t > 3.2 || this.input.jumpPressed && gp.t > 0.25) {
+    const u = Math.min(1, gp.t / PHYS.grappleTime);
+    if (d < 2.4 || gp.t >= PHYS.grappleTime || this.input.jumpPressed && gp.t > 0.25) {
       // release: keep the momentum and add a little hop
-      if (this.input.jumpPressed || d < 2.4) { this.vel.y += d < 2.4 ? 3 : 0; }
+      if (d < 2.4) this.vel.y += 3;
       this.grapple = null;
       return;
     }
-    const pull = 58;
-    this.vel.x += (dx / d) * pull * dt;
-    this.vel.y += (dy / d) * pull * dt + PHYS.gravity * 0.35 * dt;
-    this.vel.z += (dz / d) * pull * dt;
+    gp.g = 0.1 + 0.9 * u * u; // gravity share while the rope is out: light at first, back to normal as it lets go
+    const hl = Math.hypot(dx, dz) || 1;
+    const away = Math.max(0, -(wx * dx + wz * dz) / hl); // how hard the player pushes against the pull
+    const pull = PHYS.grapplePull * (1 - 0.5 * u) * (1 - 0.7 * away);
+    this.vel.x += (dx / d) * pull * dt + wx * PHYS.grappleSteer * dt;
+    this.vel.y += (dy / d) * pull * dt;
+    this.vel.z += (dz / d) * pull * dt + wz * PHYS.grappleSteer * dt;
     const sp = Math.hypot(this.vel.x, this.vel.y, this.vel.z);
-    const max = 36;
-    if (sp > max) { this.vel.multiplyScalar(max / sp); }
+    if (sp > PHYS.grappleSpeed) this.vel.multiplyScalar(PHYS.grappleSpeed / sp);
     this.grounded = false;
   }
 

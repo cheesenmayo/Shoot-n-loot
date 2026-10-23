@@ -199,11 +199,22 @@ const results = await page.evaluate(async () => {
 
   // ---- gadgets ----
   toGround(plaza.x + 60, plaza.z + 60);
+  const impulseY = p.pos.y;
   give('impulse', 0, 1); p.inv.slots[1].count = 2;
   p.aimDir.set(0, -1, 0); p.aimOrigin.copy(p.pos).setY(p.pos.y + 1.6);
   p.input.firePressed = true; step(0.35); p.input.firePressed = false;
-  let maxVy = 0; for (let i = 0; i < 75; i++) { step(1 / 30); maxVy = Math.max(maxVy, p.vel.y); }
-  ok('impulse grenade launches the thrower', maxVy > 8, `vy ${maxVy.toFixed(1)}, ex ${exLog.slice(-1)}, projectiles ${g.combat.projectiles.length}, cnt ${p.inv.slots[1] && p.inv.slots[1].count}, sel ${p.inv.sel}, throwT ${p.throwT}`);
+  let maxVy = 0, apexI = 0, airNoFall = false, flew = false;
+  for (let i = 0; i < 400; i++) {
+    step(1 / 30); maxVy = Math.max(maxVy, p.vel.y); apexI = Math.max(apexI, p.pos.y - impulseY);
+    if (!p.grounded) { flew = true; airNoFall = airNoFall || p.noFall; } else if (flew) break;
+  }
+  ok('impulse grenade launches the thrower', maxVy > 24, `vy ${maxVy.toFixed(1)}, ex ${exLog.slice(-1)}, projectiles ${g.combat.projectiles.length}, cnt ${p.inv.slots[1] && p.inv.slots[1].count}, sel ${p.inv.sel}, throwT ${p.throwT}`);
+  ok('impulse grenade launches you high (a good 15 m)', apexI > 15, `apex ${apexI.toFixed(1)}m`);
+  ok('impulse launch: no fall damage on landing', flew && p.grounded && airNoFall && p.hp === 100, `hp ${Math.round(p.hp)}, noFall in the air ${airNoFall}`);
+  ok('impulse launch: the fall protection ends on landing', p.grounded && !p.noFall);
+  // ... and nowhere else: an ordinary fall afterwards hurts again
+  p.pos.y += 25; p.grounded = false; p.vel.set(0, 0, 0); step(3);
+  ok('fall damage is back after an impulse landing', p.hp < 80 && p.grounded, `hp ${Math.round(p.hp)}`);
 
   toGround(plaza.x + 16, plaza.z);
   give('grappler', 0, 2);
@@ -214,6 +225,23 @@ const results = await page.evaluate(async () => {
   const hooked = !!p.grapple;
   let maxH = 0; for (let i = 0; i < 60; i++) { step(1 / 30); maxH = Math.max(maxH, p.pos.y - start.y); }
   ok('grappler: hooks and pulls', hooked && maxH > 3, `hooked ${hooked}, rose ${maxH.toFixed(1)}m`);
+
+  // the pull lasts about 1.5 s (a far anchor so the rope is not reached first) and the move keys steer the whole way
+  const farRope = () => { toGround(plaza.x + 30, plaza.z + 40); p.yaw = 0; p.grapple = { x: p.pos.x, y: p.pos.y + 400, z: p.pos.z - 10, t: 0, g: 0.1 }; p.grounded = false; p.vel.set(0, 2, 0); };
+  p.input.firePressed = false;
+  farRope();
+  let tRope = 0; for (let i = 0; i < 90 && p.grapple; i++) { step(1 / 30); tRope += 1 / 30; }
+  ok('grappler: the rope pulls for about 1.5 s', !p.grapple && tRope > 1.35 && tRope < 1.65, `${tRope.toFixed(2)} s`);
+  farRope(); const x0 = p.pos.x; step(1.2);
+  const dxStill = p.pos.x - x0;
+  farRope(); p.input.strafe = 1; step(1.2); p.input.strafe = 0;
+  const dxSteer = p.pos.x - x0;
+  ok('grappler: you can steer sideways while being pulled', dxSteer - dxStill > 8, `drift ${dxStill.toFixed(1)} m idle vs ${dxSteer.toFixed(1)} m steering right`);
+  farRope(); p.input.fwd = 1; step(0.5); const yWith = p.vel.y; p.input.fwd = 0;
+  farRope(); p.input.fwd = -1; step(0.5); const yAgainst = p.vel.y; p.input.fwd = 0;
+  ok('grappler: pushing against the pull slackens it (re-direct)', yWith - yAgainst > 8, `climb speed ${yWith.toFixed(1)} vs ${yAgainst.toFixed(1)} m/s`);
+  farRope(); step(0.5); p.input.jumpPressed = true; step(1 / 30); p.input.jumpPressed = false;
+  ok('grappler: jump lets go', !p.grapple);
 
   const pad = g.world.jumpPads[0];
   toGround(pad.x, pad.z, pad.y);

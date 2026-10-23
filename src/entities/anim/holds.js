@@ -430,7 +430,18 @@ function throwHold(H, A, def, info) {
 function gadgetHold(H, A, def, info, st) {
   const ch = A.ch;
   if (def.gadget === 'grapple') {
-    // pistol-like: arm along the aim, pointing at the anchor while the rope is out
+    if (ch.grapple) {
+      // the rope is out: nothing is aimed. The grappler just dangles from the right hand beside the hip,
+      // the other arm and the body keep their normal airborne pose, and the swing of the fall moves it
+      H.rw = 1; H.lw = 0; H.lAbs = false;
+      H.offQ.copy(Q_GUN);
+      H.wp.set(0.24, 0.02, -0.1);
+      qe(H.wq, -0.8, 0.1, 0.12);
+      H.rate = 11;
+      H.fkSwing = 0.5;
+      return;
+    }
+    // pistol-like, carried at low ready
     const g = GUN.pistol;
     gunStance(H, A, g);
     H.rw = 1; H.lw = 1 - A.sSprint; H.lAbs = false;
@@ -438,7 +449,6 @@ function gadgetHold(H, A, def, info, st) {
     qe(H.lq, g.qL[0], g.qL[1], g.qL[2], 'XYZ');
     H.offQ.copy(Q_GUN);
     H.rate = 24;
-    if (ch.grapple) A.pointAt(H, ch.grapple.x, ch.grapple.y, ch.grapple.z);
     return;
   }
   // launch pad: carried flat in both hands at the belt, pushed out when placed

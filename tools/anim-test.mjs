@@ -256,6 +256,25 @@ const results = await page.evaluate(async () => {
     S.stop();
   }
   {
+    // grappler: carried at low ready; while the rope pulls, the character hangs loose in the normal airborne pose with
+    // the grappler dangling from the right hand at the hip (nothing is aimed), and it goes back to the carry afterwards
+    S.reset(); const c = S.subject; S.give('grappler', 0, 1); S.step(0.7);
+    const handH = () => wp(c, c.model.armR.hand, new Vec()).y - c.pos.y;
+    const carryH = handH();
+    c.grapple = { x: c.pos.x, y: c.pos.y + 400, z: c.pos.z - 10, t: 0, g: 0.1 }; c.grounded = false; c.vel.y = 2;
+    S.step(0.8);
+    const roped = !!c.grapple, aim = c.anim.sAim, hangH = handH(), lw = c.anim.X[8];
+    const dR = wp(c, c.model.armR.hand, new Vec(0, -0.066, -0.012)).distanceTo(wp(c, c.held, new Vec()));
+    const mz = c.held.getWorldDirection(new Vec()).negate(); // the item's muzzle points along -z
+    ok('grappler: no aiming pose while the rope pulls', roped && aim < 0.1, `rope ${roped}, aim ${f2(aim)}`);
+    ok('grappler: hangs from the hand at hip height, lower than the carry', hangH < 1.1 && hangH < carryH - 0.1, `${f2(hangH)} m vs carry ${f2(carryH)} m`);
+    ok('grappler: the right hand keeps hold of it, the left arm is free', dR < 0.012 && lw < 0.25, `grip ${f2(dR * 100)} cm, left weight ${f2(lw)}`);
+    ok('grappler: the muzzle hangs pointing down', mz.y < 0.2, `muzzle dir y ${f2(mz.y)}`);
+    S.step(1.2);
+    ok('grappler: lets go after about 1.5 s', !c.grapple, `rope ${!!c.grapple}`);
+    S.stop();
+  }
+  {
     // two-handed melee weapons: the left hand stays on the handle at the moment of impact and after it; in the fastest
     // part of the downswing (k 0.3-0.4, the hammer head moves over a metre per frame) it may trail by a hand width
     const bad = [];

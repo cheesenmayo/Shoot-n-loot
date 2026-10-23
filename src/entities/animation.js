@@ -37,10 +37,8 @@ const _hp = new THREE.Vector3(), _hq = new THREE.Quaternion();
 const _pole = new THREE.Vector3(), _pole2 = new THREE.Vector3();
 const _tp = new THREE.Vector3(), _tq = new THREE.Quaternion();
 const ID = new THREE.Quaternion();
-const UP = new THREE.Vector3(0, 1, 0);
 const AX = new THREE.Vector3(1, 0, 0);
 const _qOffInv = new THREE.Quaternion();
-const _m4 = new THREE.Matrix4();
 const _eul = new THREE.Euler();
 
 const SHOULDER_X = RIG.shoulderX, SHOULDER_Y = RIG.shoulderY;
@@ -188,20 +186,6 @@ export class Animator {
     }
   }
 
-  /** Aims the weapon (hold target) at a world point; used while grappling. */
-  pointAt(H, x, y, z) {
-    const ch = this.ch;
-    _v.set(x - ch.pos.x, y - (ch.pos.y + 1.35), z - ch.pos.z);
-    const cy = Math.cos(ch.bodyYaw), sy = Math.sin(ch.bodyYaw);
-    _v.set(_v.x * cy - _v.z * sy, _v.y, _v.x * sy + _v.z * cy).normalize().applyQuaternion(_qtbi);
-    _v3.copy(_v).multiplyScalar(-1);
-    _S.crossVectors(UP, _v3).normalize();
-    if (_S.lengthSq() < 1e-4) _S.set(1, 0, 0);
-    _T.crossVectors(_v3, _S);
-    _q.setFromRotationMatrix(_m4.makeBasis(_S, _T, _v3));
-    H.wq.slerp(_q, 0.9);
-  }
-
   /** Mouth position in torso space (follows the head). */
   mouthPos(out) {
     out.set(0, 0.075, -0.12).applyQuaternion(this.headQ);
@@ -343,7 +327,7 @@ export class Animator {
     spring(X, V, S_CROUCH, ch.crouching ? 1 : 0, 13, dt);
     spring(X, V, S_AIR, grounded ? 0 : 1, grounded ? 16 : 20, dt);
     const recentShot = ch.game.time - (ch.lastShotT || -9) < 1.4;
-    const aimWanted = gun && (inp.fire || ch.ads || recentShot || ch.reload) ? 1 : kind === 'gadget' && ch.grapple ? 1 : 0;
+    const aimWanted = gun && (inp.fire || ch.ads || recentShot || ch.reload) ? 1 : 0;
     spring(X, V, S_AIM, aimWanted, aimWanted ? 14 : 5, dt);
     spring(X, V, S_ADS, ch.ads ? 1 : 0, 15, dt);
     spring(X, V, S_SPRINT, ch.sprinting && grounded && !ch.reload && !(gun && inp.fire) ? 1 : 0, 9, dt);

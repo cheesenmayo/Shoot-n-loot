@@ -65,12 +65,12 @@ melee({ id: 'sledge', name: 'Sledgehammer', icon: '🔨', model: 'sledge', dmg: 
 // ---- throwables ------------------------------------------------------------------------------------------------------------------------------------------------
 const throwable = (o) => add({ kind: 'throw', stack: 6, noise: 60, minR: 0, maxR: 4, weight: 8, tags: ['explosive'], throwSpeed: 21, gravity: 20, bounce: 0.4, ...o });
 throwable({ id: 'frag', name: 'Frag Grenade', icon: '💣', model: 'frag', dmg: 100, radius: 6.5, fuse: 2.2, stack: 6, weight: 12 });
-throwable({ id: 'impulse', desc: 'Shoves everything nearby. Throw it at your feet to launch yourself.', name: 'Impulse Grenade', icon: '🌀', model: 'impulse', dmg: 0, radius: 9, fuse: 1.3, impulse: 26, stack: 4, weight: 10, tags: ['parkour'], bounce: 0.3 });
+throwable({ id: 'impulse', desc: 'Shoves everything nearby. Throw it at your feet to launch yourself sky-high, and land without fall damage.', name: 'Impulse Grenade', icon: '🌀', model: 'impulse', dmg: 0, radius: 9, fuse: 1.3, impulse: 34, stack: 4, weight: 10, tags: ['parkour'], bounce: 0.3 });
 throwable({ id: 'dynamite', name: 'Dynamite', icon: '🧨', model: 'dynamite', dmg: 140, radius: 8, fuse: 3.4, stack: 4, weight: 7, tags: ['west', 'explosive'], throwSpeed: 18 });
 throwable({ id: 'boogie', desc: 'Makes anyone nearby dance helplessly.', name: 'Boogie Bomb', icon: '🪩', model: 'boogie', dmg: 0, radius: 9, fuse: 1.1, dance: 5.5, stack: 4, weight: 4, minR: 1, tags: ['explosive'], bounce: 0.5 });
 
 // ---- gadgets ------------------------------------------------------------------------------------------------------------------------------------------------------
-add({ id: 'grappler', desc: 'Fire at any surface to swing and pull yourself over. Jump to let go.', name: 'Grappler', kind: 'gadget', icon: '🪝', model: 'grappler', stack: 12, charges: 6, range: 70, weight: 9, tags: ['parkour'], minR: 0, maxR: 4, noise: 40, gadget: 'grapple' });
+add({ id: 'grappler', desc: 'Fire at any surface to be pulled toward it. You hang loose for about 1.5 s and can steer the whole way. Jump to let go.', name: 'Grappler', kind: 'gadget', icon: '🪝', model: 'grappler', stack: 12, charges: 6, range: 70, weight: 9, tags: ['parkour'], minR: 0, maxR: 4, noise: 40, gadget: 'grapple' });
 add({ id: 'launchpad', desc: 'Place it, then run over it to be launched skyward.', name: 'Launch Pad', kind: 'gadget', icon: '⏫', model: 'launchpad', stack: 4, charges: 2, weight: 7, tags: ['parkour'], minR: 0, maxR: 3, noise: 50, gadget: 'launchpad' });
 
 // ---- consumables -------------------------------------------------------------------------------------------------------------------------------------------------------
